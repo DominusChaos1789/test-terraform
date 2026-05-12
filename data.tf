@@ -1,22 +1,37 @@
 ###############################################################################
 # data.tf
 #
-# All IAM policy documents (JSON) and AWS data sources live here.
-# No resource blocks — purely data sources and policy documents.
+# All IAM policy documents (JSON) and AWS data sources.
+# No resource blocks — purely data sources and iam_policy_documents.
+#
+# Sections:
+#   1. AWS data sources
+#   2. Trust policies        (assume-role)
+#   3. Glue module policies  (merged into one combined document)
+#   4. EventBridge policies  (scoped to resource ARNs, not strings)
 ###############################################################################
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CALLER IDENTITY  – used to construct ARNs dynamically
+# 1. AWS DATA SOURCES
 # ─────────────────────────────────────────────────────────────────────────────
+
 data "aws_caller_identity" "current" {}
-
 data "aws_partition" "current" {}
+data "aws_region" "current" {}
+
+# S3 bucket objects – resolve ARNs from resource references, not string templates
+data "aws_s3_bucket" "landing" {
+  bucket = var.landing_bucket
+}
+
+data "aws_s3_bucket" "scripts" {
+  bucket = var.scripts_bucket
+}
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TRUST POLICIES
+# 2. TRUST POLICIES
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Trust policy: AWS Glue service can assume the Glue IAM role
 data "aws_iam_policy_document" "glue_assume_role" {
   statement {
     sid     = "GlueAssumeRole"
@@ -30,7 +45,6 @@ data "aws_iam_policy_document" "glue_assume_role" {
   }
 }
 
-# Trust policy: EventBridge can assume the EventBridge IAM role
 data "aws_iam_policy_document" "eventbridge_assume_role" {
   statement {
     sid     = "EventBridgeAssumeRole"
@@ -45,12 +59,14 @@ data "aws_iam_policy_document" "eventbridge_assume_role" {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# GLUE ROLE – INLINE POLICIES
+# 3. GLUE MODULE POLICIES
+#    Each statement group is defined separately for readability,
+#    then merged into glue_combined via source_policy_documents.
+#    iam.tf attaches only glue_combined (+ optional glue_kms).
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Policy: S3 access for dev-landing (write) and scripts bucket (read/write)
+# S3 – scripts bucket (read) and landing bucket (write)
 data "aws_iam_policy_document" "glue_s3" {
-  # Read Glue scripts from the scripts bucket
   statement {
     sid    = "ReadGlueScripts"
     effect = "Allow"
@@ -59,12 +75,11 @@ data "aws_iam_policy_document" "glue_s3" {
       "s3:ListBucket",
     ]
     resources = [
-      "arn:${data.aws_partition.current.partition}:s3:::${var.scripts_bucket}",
-      "arn:${data.aws_partition.current.partition}:s3:::${var.scripts_bucket}/*",
+      data.aws_s3_bucket.scripts.arn,
+      "${data.aws_s3_bucket.scripts.arn}/*",
     ]
   }
 
-  # Write extracted data to dev-landing bucket
   statement {
     sid    = "WriteLandingBucket"
     effect = "Allow"
@@ -76,12 +91,11 @@ data "aws_iam_policy_document" "glue_s3" {
       "s3:GetBucketLocation",
     ]
     resources = [
-      "arn:${data.aws_partition.current.partition}:s3:::${var.landing_bucket}",
-      "arn:${data.aws_partition.current.partition}:s3:::${var.landing_bucket}/*",
+      data.aws_s3_bucket.landing.arn,
+      "${data.aws_s3_bucket.landing.arn}/*",
     ]
   }
 
-  # Write temp files and Spark event logs to scripts bucket
   statement {
     sid    = "WriteGlueTempAndLogs"
     effect = "Allow"
@@ -90,13 +104,13 @@ data "aws_iam_policy_document" "glue_s3" {
       "s3:DeleteObject",
     ]
     resources = [
-      "arn:${data.aws_partition.current.partition}:s3:::${var.scripts_bucket}/tmp/*",
-      "arn:${data.aws_partition.current.partition}:s3:::${var.scripts_bucket}/spark-logs/*",
+      "${data.aws_s3_bucket.scripts.arn}/tmp/*",
+      "${data.aws_s3_bucket.scripts.arn}/spark-logs/*",
     ]
   }
 }
 
-# Policy: Secrets Manager – Glue reads DB credentials for all 36 schemas
+# Secrets Manager – scoped to the secrets created by secrets.tf
 data "aws_iam_policy_document" "glue_secrets_manager" {
   statement {
     sid    = "ReadSchemaSecrets"
@@ -105,13 +119,11 @@ data "aws_iam_policy_document" "glue_secrets_manager" {
       "secretsmanager:GetSecretValue",
       "secretsmanager:DescribeSecret",
     ]
-    resources = [
-      "arn:${data.aws_partition.current.partition}:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.environment}/${var.project}/*",
-    ]
+    resources = values(aws_secretsmanager_secret.schema_credentials)[*].arn
   }
 }
 
-# Policy: Glue Catalog – create/update databases and tables
+# Glue Catalog – create/update databases and tables
 data "aws_iam_policy_document" "glue_catalog" {
   statement {
     sid    = "GlueCatalogAccess"
@@ -136,7 +148,7 @@ data "aws_iam_policy_document" "glue_catalog" {
   }
 }
 
-# Policy: CloudWatch Logs – Glue continuous logging
+# CloudWatch Logs – Glue continuous logging
 data "aws_iam_policy_document" "glue_cloudwatch" {
   statement {
     sid    = "GlueCloudWatchLogs"
@@ -148,13 +160,13 @@ data "aws_iam_policy_document" "glue_cloudwatch" {
       "logs:AssociateKmsKey",
     ]
     resources = [
-      "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws-glue/*",
-      "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws-glue/*:*",
+      "arn:${data.aws_partition.current.partition}:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws-glue/*",
+      "arn:${data.aws_partition.current.partition}:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws-glue/*:*",
     ]
   }
 }
 
-# Policy: EC2/VPC – Glue needs these to attach to VPC for Aurora connectivity
+# EC2/VPC – Glue ENI management for Aurora connectivity
 data "aws_iam_policy_document" "glue_vpc" {
   statement {
     sid    = "GlueVPCAccess"
@@ -174,7 +186,18 @@ data "aws_iam_policy_document" "glue_vpc" {
   }
 }
 
-# Policy: KMS – decrypt secrets and S3 objects if encrypted with CMK
+# Merge all Glue policy documents into one → attached as a single inline policy
+data "aws_iam_policy_document" "glue_combined" {
+  source_policy_documents = [
+    data.aws_iam_policy_document.glue_s3.json,
+    data.aws_iam_policy_document.glue_secrets_manager.json,
+    data.aws_iam_policy_document.glue_catalog.json,
+    data.aws_iam_policy_document.glue_cloudwatch.json,
+    data.aws_iam_policy_document.glue_vpc.json,
+  ]
+}
+
+# KMS – kept separate because it is conditionally attached (enable_kms_policy)
 data "aws_iam_policy_document" "glue_kms" {
   statement {
     sid    = "GlueKMSDecrypt"
@@ -184,34 +207,31 @@ data "aws_iam_policy_document" "glue_kms" {
       "kms:GenerateDataKey",
       "kms:DescribeKey",
     ]
-    resources = [
-      "arn:${data.aws_partition.current.partition}:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:key/*",
-    ]
+    resources = ["*"]
+
     condition {
       test     = "StringLike"
       variable = "kms:ViaService"
       values = [
-        "s3.${var.aws_region}.amazonaws.com",
-        "secretsmanager.${var.aws_region}.amazonaws.com",
+        "s3.${data.aws_region.current.name}.amazonaws.com",
+        "secretsmanager.${data.aws_region.current.name}.amazonaws.com",
       ]
     }
   }
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# EVENTBRIDGE ROLE – INLINE POLICIES
+# 4. EVENTBRIDGE POLICIES
+#    Resource list built from the actual Glue job ARNs (no string templates).
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Policy: EventBridge can start all Glue jobs in this project
 data "aws_iam_policy_document" "eventbridge_start_glue_jobs" {
   statement {
-    sid    = "StartGlueExtractorJobs"
-    effect = "Allow"
-    actions = [
-      "glue:StartJobRun",
-    ]
-    resources = [
-      "arn:${data.aws_partition.current.partition}:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:job/${var.project}-${var.environment}-*-extractor",
-    ]
+    sid     = "StartGlueExtractorJobs"
+    effect  = "Allow"
+    actions = ["glue:StartJobRun"]
+
+    # Reference job ARNs directly — no hardcoded account ID or region strings
+    resources = values(aws_glue_job.extractor)[*].arn
   }
 }
