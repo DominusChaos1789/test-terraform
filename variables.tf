@@ -1,173 +1,141 @@
-###############################################################################
-# variables.tf
-###############################################################################
-
-variable "project" {
-  description = "Project name used as a prefix for all resource names."
-  type        = string
-}
-
 variable "environment" {
-  description = "Deployment environment (dev, staging, prod)."
+  description = "Deployment environment (dev, staging, prod)"
   type        = string
   default     = "dev"
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SCHEMAS
-# ─────────────────────────────────────────────────────────────────────────────
-variable "schemas" {
-  description = <<-EOT
-    List of Aurora MySQL schema configurations. Each object must include:
-      - name        : unique schema identifier (used in resource names)
-      - db_host     : Aurora cluster endpoint
-      - db_port     : MySQL port (usually 3306)
-      - db_name     : database / schema name
-      - db_user     : database username
-      - db_password : database password (stored in Secrets Manager)
-      - tables      : (optional) list of table names to extract; empty = all tables
-  EOT
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-east-1"
+}
+
+# ─── Aurora connection (shared host/port) ───────────────────────────────────
+variable "aurora_host" {
+  description = "Aurora MySQL cluster endpoint (shared across all schemas)"
+  type        = string
+}
+
+variable "aurora_port" {
+  description = "Aurora MySQL port"
+  type        = number
+  default     = 3306
+}
+
+variable "aurora_vpc_id" {
+  description = "VPC ID where Aurora resides"
+  type        = string
+}
+
+variable "aurora_subnet_ids" {
+  description = "List of subnet IDs for the Glue connection"
+  type        = list(string)
+}
+
+variable "aurora_security_group_ids" {
+  description = "Security group IDs allowed to reach Aurora"
+  type        = list(string)
+}
+
+# ─── 36 CarIAI WhatsApp schemas ─────────────────────────────────────────────
+# Each entry represents one WhatsApp-instance schema with its own credentials.
+variable "cariai_schemas" {
+  description = "List of 36 CarIAI WhatsApp schema configurations"
   type = list(object({
-    name        = string
-    db_host     = string
-    db_port     = number
-    db_name     = string
-    db_user     = string
-    db_password = string
-    tables      = optional(list(string), [])
+    schema_name = string # e.g. "cariai_wa_001"
+    username    = string
+    password    = string # Prefer referencing Secrets Manager ARNs in production
   }))
+  sensitive = true
 
   validation {
-    condition     = length(var.schemas) <= 36
-    error_message = "A maximum of 36 schemas is supported by this module."
-  }
-
-  validation {
-    condition     = length(var.schemas) > 0
-    error_message = "At least one schema must be provided."
+    condition     = length(var.cariai_schemas) == 36
+    error_message = "Exactly 36 CarIAI schemas must be provided."
   }
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# S3
-# ─────────────────────────────────────────────────────────────────────────────
-variable "landing_bucket" {
-  description = "Name of the S3 bucket where extracted data is stored (dev-landing)."
+# ─── S3 buckets (names only – ARNs derived via data sources) ────────────────
+variable "landing_bucket_name" {
+  description = "S3 bucket name for raw landing data"
   type        = string
   default     = "dev-landing"
 }
 
-variable "scripts_bucket" {
-  description = "S3 bucket where Glue PySpark scripts are stored."
+variable "logs_bucket_name" {
+  description = "S3 bucket name for Glue job logs"
   type        = string
+  default     = "dev-logs"
 }
 
-variable "scripts_prefix" {
-  description = "S3 key prefix inside scripts_bucket where job scripts are stored."
+variable "resources_bucket_name" {
+  description = "S3 bucket name for Glue scripts and resources"
   type        = string
-  default     = "glue-scripts"
+  default     = "dev-resources"
 }
 
-variable "output_format" {
-  description = "Output file format for extracted data (parquet or csv)."
+variable "cariai_prefix" {
+  description = "S3 prefix used across all buckets for CarIAI assets"
   type        = string
-  default     = "parquet"
-
-  validation {
-    condition     = contains(["parquet", "csv"], var.output_format)
-    error_message = "output_format must be 'parquet' or 'csv'."
-  }
+  default     = "cariai"
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GLUE JOB
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── Glue job settings ──────────────────────────────────────────────────────
 variable "glue_version" {
-  description = "AWS Glue version."
+  description = "AWS Glue version"
   type        = string
   default     = "4.0"
 }
 
-variable "worker_type" {
-  description = "Glue worker type (G.1X, G.2X, G.4X, G.8X)."
+variable "python_version" {
+  description = "Python version for the Glue job"
   type        = string
-  default     = "G.1X"
+  default     = "3"
 }
 
 variable "number_of_workers" {
-  description = "Number of Glue workers per job."
+  description = "Number of Glue workers"
   type        = number
   default     = 2
 }
 
+variable "worker_type" {
+  description = "Glue worker type (Standard | G.1X | G.2X | G.025X)"
+  type        = string
+  default     = "G.1X"
+}
+
 variable "job_timeout_minutes" {
-  description = "Glue job timeout in minutes."
+  description = "Glue job timeout in minutes"
   type        = number
-  default     = 60
+  default     = 120
 }
 
 variable "max_retries" {
-  description = "Number of automatic retries on job failure."
+  description = "Maximum number of retries on job failure"
   type        = number
-  default     = 1
+  default     = 0
 }
 
-variable "enable_job_bookmark" {
-  description = "Enable Glue job bookmarks for incremental loads."
-  type        = bool
-  default     = true
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# NETWORKING  (Glue VPC connectivity to Aurora)
-# ─────────────────────────────────────────────────────────────────────────────
-variable "glue_subnet_id" {
-  description = "Private subnet ID where Glue runs its elastic network interface."
+# ─── Scheduling (COT = UTC-5, so 5 AM COT = 10:00 UTC) ─────────────────────
+variable "schedule_cron" {
+  description = "EventBridge cron expression in UTC (default: 10:00 UTC = 05:00 COT)"
   type        = string
+  default     = "cron(0 10 * * ? *)"
 }
 
-variable "glue_security_group_ids" {
-  description = "List of security group IDs attached to the Glue connection ENI."
-  type        = list(string)
-}
-
-variable "availability_zone" {
-  description = "AZ that matches the glue_subnet_id."
-  type        = string
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# EVENTBRIDGE SCHEDULE
-# ─────────────────────────────────────────────────────────────────────────────
 variable "schedule_enabled" {
-  description = "Set to false to disable all EventBridge rules (useful in lower envs)."
+  description = "Whether the EventBridge schedule is enabled"
   type        = bool
   default     = true
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECRETS MANAGER
-# ─────────────────────────────────────────────────────────────────────────────
-variable "secret_recovery_window_days" {
-  description = "Days before a deleted secret is permanently purged."
-  type        = number
-  default     = 7
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# KMS
-# ─────────────────────────────────────────────────────────────────────────────
-variable "enable_kms_policy" {
-  description = "Attach a KMS policy to the Glue role (required if CMK encryption is used)."
-  type        = bool
-  default     = false
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# TAGGING
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── Tags ───────────────────────────────────────────────────────────────────
 variable "tags" {
-  description = "Tags applied to all resources."
+  description = "Common resource tags"
   type        = map(string)
-  default     = {}
+  default = {
+    Project     = "CarIAI"
+    ManagedBy   = "Terraform"
+    Application = "WhatsApp-Extractor"
+  }
 }

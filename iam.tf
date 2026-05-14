@@ -1,66 +1,71 @@
-###############################################################################
-# iam.tf
-#
-# IAM roles and policy attachments, grouped by the service module they serve.
-# All policy JSON documents are defined in data.tf.
-#
-# Sections:
-#   1. GLUE MODULE        – role + all Glue job policies merged into one inline
-#   2. EVENTBRIDGE MODULE – role + policy to trigger Glue jobs
-###############################################################################
+# ============================================================
+#  iam.tf
+#  IAM roles and policy attachments grouped by logical module.
+#  Policy *documents* live in data.tf; only resources here.
+#  ARNs are always derived — never hard-coded.
+# ============================================================
 
+# ============================================================
+#  MODULE: GLUE
+# ============================================================
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 1. GLUE MODULE
-# ═════════════════════════════════════════════════════════════════════════════
+resource "aws_iam_role" "glue" {
+  name               = "${local.name_prefix}-glue-role"
+  description        = "Execution role for the CarIAI WhatsApp Glue extraction job"
+  assume_role_policy = data.aws_iam_policy_document.glue_trust.json
 
-resource "aws_iam_role" "glue_role" {
-  name               = "${var.project}-${var.environment}-glue-extractor-role"
-  assume_role_policy = data.aws_iam_policy_document.glue_assume_role.json
-  description        = "IAM role for Glue Aurora extractor jobs (${var.environment})"
-
-  tags = var.tags
+  tags = merge(var.tags, { Module = "glue" })
 }
 
-# AWS managed policy – covers core Glue service internals
-resource "aws_iam_role_policy_attachment" "glue_service_managed" {
-  role       = aws_iam_role.glue_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
+# AWS-managed Glue service policy (covers basic Glue operations)
+resource "aws_iam_role_policy_attachment" "glue_managed_service" {
+  role       = aws_iam_role.glue.name
+  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/service-role/AWSGlueServiceRole"
 }
 
-# Single inline policy merging all Glue permissions:
-#   S3 (landing + scripts) | Secrets Manager | Glue Catalog | CloudWatch Logs | VPC
-# Merged via source_policy_documents in data.tf to keep one attachment per role.
-resource "aws_iam_role_policy" "glue_combined" {
-  name   = "${var.project}-${var.environment}-glue-combined-policy"
-  role   = aws_iam_role.glue_role.id
-  policy = data.aws_iam_policy_document.glue_combined.json
+# Inline: S3 access (landing, logs, resources)
+resource "aws_iam_role_policy" "glue_s3" {
+  name   = "cariai-glue-s3-access"
+  role   = aws_iam_role.glue.id
+  policy = data.aws_iam_policy_document.glue_s3.json
 }
 
-# KMS inline policy – attached only when CMK encryption is enabled
-resource "aws_iam_role_policy" "glue_kms" {
-  count  = var.enable_kms_policy ? 1 : 0
-  name   = "${var.project}-${var.environment}-glue-kms-policy"
-  role   = aws_iam_role.glue_role.id
-  policy = data.aws_iam_policy_document.glue_kms.json
+# Inline: CloudWatch Logs & Metrics
+resource "aws_iam_role_policy" "glue_cloudwatch" {
+  name   = "cariai-glue-cloudwatch"
+  role   = aws_iam_role.glue.id
+  policy = data.aws_iam_policy_document.glue_cloudwatch.json
 }
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# 2. EVENTBRIDGE MODULE
-# ═════════════════════════════════════════════════════════════════════════════
-
-resource "aws_iam_role" "eventbridge_role" {
-  name               = "${var.project}-${var.environment}-eventbridge-glue-role"
-  assume_role_policy = data.aws_iam_policy_document.eventbridge_assume_role.json
-  description        = "Allows EventBridge to trigger Glue extractor jobs (${var.environment})"
-
-  tags = var.tags
+# Inline: VPC/EC2 networking (needed for Glue connection to Aurora)
+resource "aws_iam_role_policy" "glue_vpc_networking" {
+  name   = "cariai-glue-vpc-networking"
+  role   = aws_iam_role.glue.id
+  policy = data.aws_iam_policy_document.glue_vpc_networking.json
 }
 
-# Single inline policy – scoped to StartJobRun on this project's extractor jobs only
-resource "aws_iam_role_policy" "eventbridge_glue" {
-  name   = "${var.project}-${var.environment}-eventbridge-glue-policy"
-  role   = aws_iam_role.eventbridge_role.id
-  policy = data.aws_iam_policy_document.eventbridge_start_glue_jobs.json
+# Inline: Glue catalog + connection access
+resource "aws_iam_role_policy" "glue_service" {
+  name   = "cariai-glue-service-access"
+  role   = aws_iam_role.glue.id
+  policy = data.aws_iam_policy_document.glue_service.json
+}
+
+# ============================================================
+#  MODULE: EVENTBRIDGE SCHEDULER
+# ============================================================
+
+resource "aws_iam_role" "eventbridge_scheduler" {
+  name               = "${local.name_prefix}-scheduler-role"
+  description        = "Allows EventBridge Scheduler to start the CarIAI Glue job"
+  assume_role_policy = data.aws_iam_policy_document.eventbridge_trust.json
+
+  tags = merge(var.tags, { Module = "eventbridge" })
+}
+
+# Inline: permission to call glue:StartJobRun on our specific job
+resource "aws_iam_role_policy" "eventbridge_start_glue" {
+  name   = "cariai-scheduler-start-glue"
+  role   = aws_iam_role.eventbridge_scheduler.id
+  policy = data.aws_iam_policy_document.eventbridge_start_glue.json
 }

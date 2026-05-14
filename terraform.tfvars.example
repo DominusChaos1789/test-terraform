@@ -1,0 +1,81 @@
+# ============================================================
+#  terraform.tfvars  (example – do NOT commit passwords to git)
+#  In production, source passwords from AWS Secrets Manager
+#  and pass them via a data source or CI/CD secret injection.
+# ============================================================
+
+environment = "dev"
+region      = "us-east-1"
+
+# ── Aurora connectivity ──────────────────────────────────────
+aurora_host               = "cariai-cluster.cluster-xxxxxxxxxx.us-east-1.rds.amazonaws.com"
+aurora_port               = 3306
+aurora_vpc_id             = "vpc-0abc123def456789a"
+aurora_subnet_ids         = ["subnet-0111aaa", "subnet-0222bbb"]
+aurora_security_group_ids = ["sg-0cariai123456"]
+
+# ── S3 buckets ───────────────────────────────────────────────
+landing_bucket_name   = "dev-landing"
+logs_bucket_name      = "dev-logs"
+resources_bucket_name = "dev-resources"
+cariai_prefix         = "cariai"
+
+# ── Glue job ─────────────────────────────────────────────────
+glue_version        = "4.0"
+python_version      = "3"
+number_of_workers   = 4
+worker_type         = "G.1X"
+job_timeout_minutes = 120
+max_retries         = 0
+
+# ── Schedule: 05:00 COT every day (UTC-5, no DST in Colombia) ─
+schedule_cron    = "cron(0 10 * * ? *)"
+schedule_enabled = true
+
+# ── 36 CarIAI WhatsApp schemas ───────────────────────────────
+# Replace with real credentials; use Secrets Manager in production.
+cariai_schemas = [
+  { schema_name = "cariai_wa_001", username = "user_001", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_002", username = "user_002", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_003", username = "user_003", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_004", username = "user_004", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_005", username = "user_005", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_006", username = "user_006", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_007", username = "user_007", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_008", username = "user_008", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_009", username = "user_009", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_010", username = "user_010", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_011", username = "user_011", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_012", username = "user_012", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_013", username = "user_013", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_014", username = "user_014", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_015", username = "user_015", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_016", username = "user_016", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_017", username = "user_017", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_018", username = "user_018", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_019", username = "user_019", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_020", username = "user_020", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_021", username = "user_021", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_022", username = "user_022", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_023", username = "user_023", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_024", username = "user_024", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_025", username = "user_025", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_026", username = "user_026", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_027", username = "user_027", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_028", username = "user_028", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_029", username = "user_029", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_030", username = "user_030", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_031", username = "user_031", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_032", username = "user_032", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_033", username = "user_033", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_034", username = "user_034", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_035", username = "user_035", password = "CHANGE_ME" },
+  { schema_name = "cariai_wa_036", username = "user_036", password = "CHANGE_ME" },
+]
+
+tags = {
+  Project     = "CarIAI"
+  ManagedBy   = "Terraform"
+  Application = "WhatsApp-Extractor"
+  Environment = "dev"
+}
