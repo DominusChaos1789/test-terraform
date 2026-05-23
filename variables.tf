@@ -1,44 +1,40 @@
-# =============================================================================
-# root/variables.tf
-# =============================================================================
+variable "environment" {
+  description = "Deployment environment (dev / staging / prod)."
+  type        = string
+  default     = "dev"
+}
 
 variable "aws_region" {
-  type    = string
-  default = "us-east-1"
-}
-
-variable "db_username" {
-  type      = string
-  sensitive = true
-}
-
-variable "db_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "subnet_id" {
+  description = "AWS region where resources are deployed."
   type        = string
-  description = "Subnet ID for Glue connection ENIs."
+  default     = "us-east-1"
 }
 
-variable "availability_zone" {
+variable "vpc_id" {
+  description = "ID of the VPC that contains the Aurora clusters and the Glue connection subnet."
   type        = string
-  description = "AZ matching the subnet (e.g. us-east-1a)."
 }
 
-variable "scripts_bucket" {
-  type        = string
-  description = "S3 bucket that stores Glue scripts and temp output."
-}
-
-variable "database_names" {
+variable "glue_extra_jars" {
+  description = "Optional list of extra JAR S3 URIs to attach to the Glue job (e.g. MySQL JDBC driver)."
   type        = list(string)
-  description = "36 Aurora MySQL schema names, one per instance."
-}
-
-variable "tables_to_extract" {
-  type        = list(string)
-  description = "Specific tables to extract. Leave empty to extract ALL tables."
   default     = []
+}
+
+variable "enable_bookmark" {
+  description = "Enable Glue job bookmarks to support incremental loads."
+  type        = bool
+  default     = false
+}
+
+variable "additional_job_args" {
+  description = "Map of extra --key=value arguments merged into the Glue job default arguments."
+  type        = map(string)
+  default     = {}
+}
+
+variable "log_retention_days" {
+  description = "CloudWatch log group retention in days."
+  type        = number
+  default     = 14
 }
