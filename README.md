@@ -1,138 +1,71 @@
-# Terraform Module: `glue_aurora_extractor`
+# cariai-batch-extractor — Terraform Module
 
-Provisions AWS infrastructure to extract data from **up to 36 Aurora MySQL schemas** into S3, triggered daily at **05:00 COT** via EventBridge.
+Deploys a complete AWS Glue extraction pipeline that reads from **36 Aurora MySQL** databases and writes Parquet files to the `dev-landing` S3 bucket, triggered daily at **05:00 COT** via EventBridge Scheduler.
 
----
-
-## Architecture
+## File structure
 
 ```
-EventBridge Rule (cron 10:00 UTC = 05:00 COT)
-        │
-        ▼  (per schema)
-  AWS Glue Job  ──── Glue Connection ──▶  Aurora MySQL (schema_N)
-        │                                   │
-        │  reads credentials from           │
-        ▼                                   │
-  Secrets Manager                           │
-        │                                   │
-        ▼                                   │
-  s3://dev-landing/<schema_name>/<table>/  ◀─┘  (Parquet output)
-        │
-        ▼
-  Glue Data Catalog (database per schema)
+.
+├── versions.tf        # Terraform + provider pin
+├── variables.tf       # Input variables
+├── locals.tf          # All computed/static values (single source of truth)
+├── data.tf            # Remote lookups: SSM, S3, IAM policy documents
+├── iam.tf             # IAM roles + policies (Glue + Scheduler)
+├── glue.tf            # Glue connection, job, EventBridge schedule
+├── s3.tf              # S3 object upload (Glue script)
+├── outputs.tf         # Exported values
+└── scripts/
+    └── extractor.py   # PySpark ETL script uploaded to S3
 ```
 
-## File Structure
+## Resources created
 
-```
-modules/glue_aurora_extractor/
-├── main.tf        # Glue jobs, connections, EventBridge rules, Secrets Manager
-├── iam.tf         # IAM roles and policy attachments
-├── data.tf        # ALL IAM policy JSON documents + data sources
-├── variables.tf   # Input variables
-├── outputs.tf     # Output values
-└── versions.tf    # Provider requirements
-```
-
-## Resources Created (per schema)
-
-| Resource | Count |
+| Resource | Name |
 |---|---|
-| `aws_secretsmanager_secret` | 1 per schema |
-| `aws_glue_connection` (JDBC) | 1 per schema |
-| `aws_glue_job` | 1 per schema |
-| `aws_cloudwatch_event_rule` | 1 per schema |
-| `aws_cloudwatch_event_target` | 1 per schema |
-| `aws_glue_catalog_database` | 1 per schema |
+| `aws_glue_connection` | `cariai-batch-extractor-jdbc` |
+| `aws_glue_job` | `cariai-batch-extractor` |
+| `aws_iam_role` (Glue) | `cariai-batch-extractor-glue-role` |
+| `aws_iam_role` (Scheduler) | `cariai-batch-extractor-scheduler-role` |
+| `aws_scheduler_schedule` | `cariai-batch-extractor-daily-trigger` |
+| `aws_cloudwatch_log_group` | `/aws-glue/jobs/cariai-batch-extractor` |
+| `aws_s3_object` (script) | `dev-landing/glue-scripts/cariai-batch-extractor.py` |
 
-Shared across all schemas:
+## Key design decisions
 
-| Resource | Count |
-|---|---|
-| `aws_iam_role` (Glue) | 1 |
-| `aws_iam_role` (EventBridge) | 1 |
-| All IAM policies (inline) | 1 set |
+### Connection credentials
+The `aws_glue_connection` resource requires `USERNAME`/`PASSWORD` keys — they are set to `"placeholder"`. **Real credentials are fetched at runtime** by the Python script from AWS Secrets Manager (`augusta-nexa-dev/cariai/batch/db-credentials`). Update the path in `scripts/extractor.py` to match your secrets layout.
 
----
+### 36 databases as a job argument
+The list of database names lives in `locals.tf → local.db_list`. The Python script receives them as a comma-separated string via `--db_list`, iterates over each, discovers tables dynamically, and writes Parquet partitions to:
+```
+s3://dev-landing/raw/<db_name>/<table_name>/
+```
 
-## Schedule
+### Schedule timezone
+EventBridge Scheduler supports IANA timezone names. The schedule is set to `America/Bogota` (COT, UTC-5) at cron `0 10 * * ? *` — which equals exactly 05:00 COT regardless of DST.
 
-**05:00 COT** (Colombia Time, UTC-5) = **10:00 UTC**
-
-EventBridge cron expression: `cron(0 10 * * ? *)`
-
-> Colombia does **not** observe daylight saving time, so this offset is constant year-round.
-
----
+### Error handling
+A single failing table does **not** abort the job. Failures are logged to CloudWatch and the job continues with the remaining tables/databases.
 
 ## Usage
 
 ```hcl
-module "glue_aurora_extractor" {
-  source = "./modules/glue_aurora_extractor"
-
-  project        = "data-platform"
-  environment    = "dev"
-  aws_region     = "us-east-1"
-  landing_bucket = "dev-landing"
-  scripts_bucket = "my-glue-scripts-bucket"
-
-  glue_subnet_id          = "subnet-xxxxxxxx"
-  glue_security_group_ids = ["sg-xxxxxxxx"]
-  availability_zone       = "us-east-1a"
-
-  schemas = [
-    {
-      name        = "schema_01"
-      db_host     = "cluster-01.cluster-xxxx.us-east-1.rds.amazonaws.com"
-      db_port     = 3306
-      db_name     = "schema_01"
-      db_user     = "etl_user_01"
-      db_password = var.schema_passwords["schema_01"]
-      tables      = []   # empty = all tables
-    },
-    # ... up to 36 schemas
-  ]
-
-  tags = {
-    Environment = "dev"
-    ManagedBy   = "terraform"
-  }
+module "glue_extractor" {
+  source      = "./terraform-glue-module"
+  environment = "dev"
+  aws_region  = "us-east-1"
+  vpc_id      = "vpc-0abc1234def56789a"
 }
 ```
 
----
+## Required IAM permissions to deploy
 
-## Security Notes
+The Terraform executor needs permissions to create IAM roles, Glue jobs/connections, EventBridge schedules, CloudWatch log groups, and S3 objects.
 
-1. **Passwords are never hard-coded.** Store them in Terraform workspace variables or pass via `TF_VAR_schema_passwords`.
-2. Secrets Manager holds the full DB credentials; the Glue job reads them at runtime via `SECRET_ARN`.
-3. The IAM policies in `data.tf` follow least-privilege: S3 write is scoped to `dev-landing/*` only.
-4. Enable `enable_kms_policy = true` if your S3 bucket or Secrets Manager uses a CMK.
+## Pre-requisites
 
----
-
-## Deploying the Glue Scripts
-
-Upload the PySpark script to S3 before running the jobs:
-
-```bash
-aws s3 cp glue_scripts/aurora_extractor_template.py \
-  s3://<scripts_bucket>/glue-scripts/aurora-extractor/<schema_name>_extractor.py
-```
-
-Or automate it with a `null_resource` + `aws s3 cp` in your root module.
-
----
-
-## Outputs
-
-| Name | Description |
-|---|---|
-| `glue_job_names` | Map of schema → Glue job name |
-| `glue_job_arns` | Map of schema → Glue job ARN |
-| `glue_role_arn` | Shared Glue IAM role ARN |
-| `eventbridge_rule_arns` | Map of schema → EventBridge rule ARN |
-| `secret_arns` | Map of schema → Secrets Manager ARN (sensitive) |
-| `glue_catalog_databases` | Map of schema → Glue catalog DB name |
+1. `dev-landing` S3 bucket must exist before `terraform apply`.
+2. SSM parameter `augusta-nexa-dev/cariai/batch/connection` must exist with the JSON payload.
+3. Secrets Manager secret `augusta-nexa-dev/cariai/batch/db-credentials` must contain `{"username": "...", "password": "..."}`.
+4. The MySQL JDBC driver JAR must be available in S3 if not bundled. Pass its URI via `var.glue_extra_jars`.
+5. The subnet and security group must allow outbound TCP to Aurora on port 3306.

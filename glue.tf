@@ -1,85 +1,109 @@
-###############################################################################
-# glue.tf
-#
-# Glue JDBC connections, ETL jobs, and Catalog databases.
-# One of each resource per schema (for_each over local.schema_map).
-###############################################################################
-
-# ─────────────────────────────────────────────────────────────────────────────
-# GLUE CONNECTIONS  – JDBC connection to each Aurora schema
-# ─────────────────────────────────────────────────────────────────────────────
-resource "aws_glue_connection" "aurora" {
-  for_each = local.schema_map
-
-  name            = "${var.project}-${var.environment}-${each.key}-conn"
-  connection_type = "JDBC"
+# ── Glue JDBC Connection ──────────────────────────────────────────────────────
+# One shared connection for all 36 Aurora MySQL databases.
+# The Python script appends the specific database name to the base JDBC URL.
+resource "aws_glue_connection" "aurora_mysql" {
+  name            = local.connection_name
+  description     = "JDBC connection to Aurora MySQL cluster (host read from Parameter Store)"
+  connection_type = local.connection_params["type"] # "JDBC"
 
   connection_properties = {
-    JDBC_CONNECTION_URL = "jdbc:mysql://${each.value.db_host}:${each.value.db_port}/${each.value.db_name}"
-    USERNAME            = each.value.db_user
-    PASSWORD            = each.value.db_password
+    JDBC_CONNECTION_URL = local.jdbc_url
+    # Credentials are injected at runtime from Parameter Store via the job script.
+    # Glue requires these keys to exist; we set placeholder values and let the
+    # script override via boto3/SSM at execution time.
+    USERNAME = "placeholder"
+    PASSWORD  = "placeholder"
   }
 
   physical_connection_requirements {
-    availability_zone      = var.availability_zone
-    security_group_id_list = var.glue_security_group_ids
-    subnet_id              = var.glue_subnet_id
+    subnet_id              = local.subnet_id
+    security_group_id_list = local.security_group_ids
+    availability_zone      = "${var.aws_region}a" # overrideable via locals if needed
   }
 
-  tags = merge(var.tags, { Schema = each.key })
+  tags = local.common_tags
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GLUE JOBS  – one ETL job per schema
-# ─────────────────────────────────────────────────────────────────────────────
+# ── CloudWatch Log Group ──────────────────────────────────────────────────────
+resource "aws_cloudwatch_log_group" "glue_job" {
+  name              = "/aws-glue/jobs/${local.job_name}"
+  retention_in_days = var.log_retention_days
+  tags              = local.common_tags
+}
+
+# ── Glue Job ──────────────────────────────────────────────────────────────────
 resource "aws_glue_job" "extractor" {
-  for_each = local.schema_map
+  name        = local.job_name
+  description = local.job_description
+  role_arn    = aws_iam_role.glue_job.arn
 
-  name              = "${var.project}-${var.environment}-${each.key}-extractor"
-  role_arn          = aws_iam_role.glue_role.arn
-  glue_version      = var.glue_version
-  worker_type       = var.worker_type
-  number_of_workers = var.number_of_workers
-  timeout           = var.job_timeout_minutes
-  max_retries       = var.max_retries
+  glue_version      = local.glue_version
+  worker_type       = local.worker_type
+  number_of_workers = local.number_of_workers
+  max_retries       = local.max_retries
+  timeout           = local.timeout_minutes
 
-  connections = [aws_glue_connection.aurora[each.key].name]
+  connections = [aws_glue_connection.aurora_mysql.name]
 
   command {
     name            = "glueetl"
-    script_location = "s3://${var.scripts_bucket}/${var.scripts_prefix}/${each.key}_extractor.py"
-    python_version  = "3"
+    python_version  = local.python_version
+    script_location = "s3://${local.landing_bucket_name}/${local.script_s3_key}"
   }
 
-  default_arguments = {
-    "--job-language"                     = "python"
-    "--job-bookmark-option"              = var.enable_job_bookmark ? "job-bookmark-enable" : "job-bookmark-disable"
-    "--enable-metrics"                   = ""
-    "--enable-continuous-cloudwatch-log" = "true"
-    "--enable-spark-ui"                  = "true"
-    "--spark-event-logs-path"            = "s3://${var.scripts_bucket}/spark-logs/"
-    "--TempDir"                          = "s3://${var.scripts_bucket}/tmp/"
+  default_arguments = merge(
+    {
+      # Glue built-ins
+      "--job-language"                     = "python"
+      "--job-bookmark-option"              = var.enable_bookmark ? "job-bookmark-enable" : "job-bookmark-disable"
+      "--enable-continuous-cloudwatch-log" = "true"
+      "--enable-metrics"                   = "true"
+      "--enable-spark-ui"                  = "false"
+      "--TempDir"                          = "s3://${local.landing_bucket_name}/tmp/${local.job_name}/"
+      "--extra-jars"                       = length(var.glue_extra_jars) > 0 ? join(",", var.glue_extra_jars) : ""
 
-    "--SOURCE_SCHEMA"     = each.key
-    "--SOURCE_HOST"       = each.value.db_host
-    "--SOURCE_PORT"       = tostring(each.value.db_port)
-    "--SOURCE_DB"         = each.value.db_name
-    "--SECRET_ARN"        = aws_secretsmanager_secret.schema_credentials[each.key].arn
-    "--TARGET_BUCKET"     = var.landing_bucket
-    "--TARGET_PREFIX"     = each.key
-    "--TARGET_FORMAT"     = var.output_format
-    "--TABLES_TO_EXTRACT" = join(",", lookup(each.value, "tables", []))
+      # Custom arguments read by the Python script
+      "--ssm_connection_path" = local.ssm_connection_path   # host / port / type
+      "--ssm_datasets_path"   = local.ssm_datasets_path     # table catalog (dim + fact)
+      "--s3_landing_bucket"   = local.landing_bucket_name
+      # Format: "db_key::secret_path,...,db_key::secret_path"
+      # Secret JSON per DB: {"user": "...", "password": "..."}
+      "--db_secret_pairs"     = local.db_secret_pairs
+      "--aws_region"          = var.aws_region
+    },
+    var.additional_job_args
+  )
+
+  execution_property {
+    max_concurrent_runs = 1
   }
 
-  tags = merge(var.tags, { Schema = each.key })
+  tags = local.common_tags
+
+  depends_on = [aws_cloudwatch_log_group.glue_job]
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GLUE CATALOG DATABASES  – one logical database per schema
-# ─────────────────────────────────────────────────────────────────────────────
-resource "aws_glue_catalog_database" "schema_db" {
-  for_each = local.schema_map
+# ── EventBridge Scheduler (5 AM COT = 10 AM UTC) ──────────────────────────────
+resource "aws_scheduler_schedule" "glue_job_trigger" {
+  name        = "${local.job_name}-daily-trigger"
+  description = "Triggers ${local.job_name} every day at 05:00 COT (10:00 UTC)"
+  group_name  = "default"
 
-  name        = "${var.project}_${var.environment}_${replace(each.key, "-", "_")}"
-  description = "Glue catalog for extracted data from schema ${each.key}"
+  flexible_time_window {
+    mode = "OFF" # exact time, no flexibility window
+  }
+
+  schedule_expression          = local.schedule_expression
+  schedule_expression_timezone = "America/Bogota" # COT — EventBridge supports IANA tz
+
+  target {
+    arn      = "arn:aws:glue:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:job/${local.job_name}"
+    role_arn = aws_iam_role.scheduler.arn
+
+    input = jsonencode({
+      JobName = local.job_name
+    })
+  }
+
+  depends_on = [aws_glue_job.extractor]
 }
