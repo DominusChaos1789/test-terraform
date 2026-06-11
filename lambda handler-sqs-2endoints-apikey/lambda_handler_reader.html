@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Lambda Handler — API Gateway Docs</title>
+<style>
+  :root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --border:   #21262d;
+    --accent:   #f78166;
+    --green:    #3fb950;
+    --blue:     #79c0ff;
+    --yellow:   #e3b341;
+    --purple:   #d2a8ff;
+    --muted:    #8b949e;
+    --text:     #e6edf3;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    --font-sans: 'Inter', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-sans); }
+
+  /* ── Layout ── */
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 220px; flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  .main { flex: 1; padding: 40px 48px; max-width: 860px; }
+
+  /* ── Sidebar ── */
+  .sidebar-logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .sidebar-logo h2 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .sidebar-logo p  { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .nav-section { padding: 8px 20px 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .nav-item {
+    display: block; padding: 7px 20px;
+    font-size: 13px; color: var(--muted);
+    cursor: pointer; border-left: 2px solid transparent;
+    transition: all .15s;
+  }
+  .nav-item:hover  { color: var(--text); background: rgba(255,255,255,.04); }
+  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(247,129,102,.06); }
+
+  /* ── Section tabs ── */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
+  .tab {
+    padding: 10px 18px; font-size: 13px; color: var(--muted);
+    cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: all .15s;
+  }
+  .tab:hover  { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Content panels ── */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ── Hero ── */
+  .hero { margin-bottom: 40px; }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(63,185,80,.1); border: 1px solid rgba(63,185,80,.3);
+    color: var(--green); font-size: 12px; padding: 4px 12px; border-radius: 20px;
+    margin-bottom: 16px;
+  }
+  .dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .hero h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  .hero h1 span { color: var(--accent); }
+  .hero p { color: var(--muted); font-size: 14px; line-height: 1.7; max-width: 580px; }
+
+  /* ── Flow diagram ── */
+  .flow {
+    display: flex; align-items: center; gap: 0;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 24px;
+    margin-bottom: 32px; overflow-x: auto;
+  }
+  .flow-node {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center; flex-shrink: 0;
+  }
+  .flow-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; margin-bottom: 6px;
+  }
+  .flow-label { font-size: 11px; color: var(--muted); }
+  .flow-sublabel { font-size: 10px; color: var(--accent); margin-top: 2px; }
+  .flow-arrow { color: var(--muted); font-size: 18px; padding: 0 10px; flex-shrink: 0; padding-bottom: 20px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px 24px; margin-bottom: 16px;
+  }
+  .card-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .tag {
+    font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600;
+    font-family: var(--font-mono);
+  }
+  .tag-post   { background: rgba(63,185,80,.15);  color: var(--green); }
+  .tag-get    { background: rgba(121,192,255,.15); color: var(--blue); }
+  .tag-202    { background: rgba(63,185,80,.15);   color: var(--green); }
+  .tag-400    { background: rgba(227,179,65,.15);  color: var(--yellow); }
+  .tag-500    { background: rgba(247,129,102,.15); color: var(--accent); }
+  .tag-env    { background: rgba(210,168,255,.15); color: var(--purple); }
+
+  /* ── Code blocks ── */
+  pre {
+    background: #010409; border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px 20px; overflow-x: auto; font-family: var(--font-mono);
+    font-size: 13px; line-height: 1.7; margin: 12px 0;
+  }
+  .kw   { color: #ff7b72; }
+  .str  { color: #a5d6ff; }
+  .fn   { color: #d2a8ff; }
+  .cm   { color: #8b949e; font-style: italic; }
+  .var  { color: #ffa657; }
+  .num  { color: #79c0ff; }
+  .key  { color: #e3b341; }
+
+  /* ── Steps ── */
+  .steps { counter-reset: step; }
+  .step {
+    display: flex; gap: 16px; margin-bottom: 20px;
+    counter-increment: step;
+  }
+  .step-num {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    background: rgba(247,129,102,.15); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; margin-top: 2px;
+  }
+  .step-body h4 { font-size: 14px; margin-bottom: 4px; }
+  .step-body p  { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  code {
+    background: rgba(255,255,255,.07); border-radius: 4px;
+    padding: 1px 6px; font-family: var(--font-mono); font-size: 12px;
+    color: var(--blue);
+  }
+
+  /* ── Env table ── */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing:.06em; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.05); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .req { color: var(--accent); font-size: 11px; }
+
+  /* ── S3 path example ── */
+  .s3path {
+    background: #010409; border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 18px; font-family: var(--font-mono); font-size: 13px; color: var(--green);
+    margin: 12px 0;
+  }
+
+  /* ── Section headers ── */
+  h3 { font-size: 16px; font-weight: 600; margin: 28px 0 12px; color: var(--text); }
+  h3:first-child { margin-top: 0; }
+
+  /* ── IAM permissions ── */
+  .perm-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .perm {
+    background: rgba(121,192,255,.08); border: 1px solid rgba(121,192,255,.2);
+    color: var(--blue); font-family: var(--font-mono); font-size: 12px;
+    padding: 3px 10px; border-radius: 4px;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 700px) {
+    .sidebar { display: none; }
+    .main { padding: 24px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <h2>Lambda Handler</h2>
+      <p>API Gateway → SQS → S3</p>
+    </div>
+
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active" onclick="showTab('overview', this)">Architecture</div>
+    <div class="nav-item" onclick="showTab('overview', this)">Flow</div>
+
+    <div class="nav-section">Endpoints</div>
+    <div class="nav-item" onclick="showTab('endpoints', this)">/details</div>
+    <div class="nav-item" onclick="showTab('endpoints', this)">/summary</div>
+
+    <div class="nav-section">Code</div>
+    <div class="nav-item" onclick="showTab('code', this)">Full Handler</div>
+    <div class="nav-item" onclick="showTab('code', this)">Step by Step</div>
+
+    <div class="nav-section">Config</div>
+    <div class="nav-item" onclick="showTab('config', this)">Env Variables</div>
+    <div class="nav-item" onclick="showTab('config', this)">IAM Permissions</div>
+    <div class="nav-item" onclick="showTab('config', this)">S3 Path</div>
+  </nav>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('overview')">Overview</div>
+      <div class="tab" onclick="switchTab('endpoints')">Endpoints</div>
+      <div class="tab" onclick="switchTab('code')">Code walkthrough</div>
+      <div class="tab" onclick="switchTab('config')">Config & IAM</div>
+    </div>
+
+    <!-- ══════════════════════ OVERVIEW ══════════════════════ -->
+    <div id="tab-overview" class="panel active">
+      <div class="hero">
+        <div class="hero-badge"><div class="dot"></div>Lambda Proxy Integration</div>
+        <h1>Transcript Ingestion <span>Handler</span></h1>
+        <p>Receives conversation transcripts from your client, validates them, queues them in SQS, and lands raw JSON in the S3 <strong>landing</strong> bucket — partitioned by endpoint and date.</p>
+      </div>
+
+      <!-- Flow diagram -->
+      <div class="flow">
+        <div class="flow-node">
+          <div class="flow-icon" style="background:rgba(121,192,255,.1)">🌐</div>
+          <div class="flow-label">Client</div>
+          <div class="flow-sublabel">POST + x-api-key</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-icon" style="background:rgba(247,129,102,.1)">🛡️</div>
+          <div class="flow-label">WAF</div>
+          <div class="flow-sublabel">Web ACL</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-icon" style="background:rgba(227,179,65,.1)">🔑</div>
+          <div class="flow-label">API Gateway</div>
+          <div class="flow-sublabel">API Key auth</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-icon" style="background:rgba(210,168,255,.1)">λ</div>
+          <div class="flow-label">Lambda</div>
+          <div class="flow-sublabel">this handler</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-icon" style="background:rgba(63,185,80,.1)">📨</div>
+          <div class="flow-label">SQS</div>
+          <div class="flow-sublabel">queue</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-icon" style="background:rgba(121,192,255,.1)">🪣</div>
+          <div class="flow-label">S3 landing</div>
+          <div class="flow-sublabel">Parquet-ready</div>
+        </div>
+      </div>
+
+      <h3>What the Lambda does — 7 steps</h3>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-body"><h4>Identify the endpoint</h4><p>Reads <code>event["resource"]</code> to decide if the call is for <code>/details</code> or <code>/summary</code>. Rejects anything else with 404.</p></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-body"><h4>Enforce POST only</h4><p>Returns 405 if the HTTP method is not POST.</p></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body"><h4>Parse JSON body</h4><p>Calls <code>json.loads()</code> on the raw body string. Returns 400 on invalid JSON.</p></div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-body"><h4>Validate required fields</h4><p>Checks that the payload contains the expected keys per endpoint. Returns 400 with a clear message listing what's missing.</p></div></div>
+        <div class="step"><div class="step-num">5</div><div class="step-body"><h4>Enrich with metadata</h4><p>Adds a <code>record_id</code> (UUID4), <code>endpoint</code> name, and <code>received_at</code> ISO timestamp before forwarding.</p></div></div>
+        <div class="step"><div class="step-num">6</div><div class="step-body"><h4>Send to SQS</h4><p>Pushes the enriched JSON to the queue. Returns 500 if SQS fails — the request is retryable.</p></div></div>
+        <div class="step"><div class="step-num">7</div><div class="step-body"><h4>Write to S3 landing</h4><p>Saves the record as <code>.json</code> with a Hive-compatible partition key. S3 failure is logged but does <em>not</em> fail the request (SQS already has the data).</p></div></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ ENDPOINTS ══════════════════════ -->
+    <div id="tab-endpoints" class="panel">
+      <h3>POST /details</h3>
+      <div class="card">
+        <div class="card-title"><span class="tag tag-post">POST</span> /details — full conversation transcript</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Use this endpoint to send the raw, full transcript of a conversation.</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:6px;">Required fields:</p>
+        <pre><span class="key">"conversation_id"</span>: <span class="str">"conv_abc123"</span>,   <span class="cm">// unique ID for the conversation</span>
+<span class="key">"agent_id"</span>:        <span class="str">"agent_007"</span>,    <span class="cm">// who handled it</span>
+<span class="key">"transcript"</span>:      <span class="str">"Customer: Hello...</span>
+<span class="str">                   Agent: Hi, how can I help..."</span>  <span class="cm">// full text</span></pre>
+
+        <p style="font-size:12px;color:var(--muted);margin:12px 0 6px;">Example curl:</p>
+        <pre>curl -X POST https://&lt;api-id&gt;.execute-api.us-east-1.amazonaws.com/prod/details \
+  -H <span class="str">"x-api-key: YOUR_API_KEY"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{
+    "conversation_id": "conv_abc123",
+    "agent_id": "agent_007",
+    "transcript": "Customer: Hello...\nAgent: Hi, how can I help?"
+  }'</span></pre>
+
+        <p style="font-size:12px;color:var(--muted);margin:12px 0 6px;">Success response <span class="tag tag-202">202</span>:</p>
+        <pre>{
+  <span class="key">"message"</span>:   <span class="str">"Transcript received successfully."</span>,
+  <span class="key">"record_id"</span>: <span class="str">"f47ac10b-58cc-4372-a567-0e02b2c3d479"</span>,
+  <span class="key">"endpoint"</span>:  <span class="str">"details"</span>,
+  <span class="key">"s3_key"</span>:    <span class="str">"transcripts/details/2025/06/11/f47ac10b-....json"</span>
+}</pre>
+      </div>
+
+      <h3>POST /summary</h3>
+      <div class="card">
+        <div class="card-title"><span class="tag tag-post">POST</span> /summary — summarised conversation</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Use this endpoint to send a short summary of a resolved conversation.</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:6px;">Required fields:</p>
+        <pre><span class="key">"conversation_id"</span>: <span class="str">"conv_abc123"</span>,
+<span class="key">"summary_text"</span>:    <span class="str">"Customer asked about billing. Issue resolved."</span></pre>
+
+        <p style="font-size:12px;color:var(--muted);margin:12px 0 6px;">Example curl:</p>
+        <pre>curl -X POST https://&lt;api-id&gt;.execute-api.us-east-1.amazonaws.com/prod/summary \
+  -H <span class="str">"x-api-key: YOUR_API_KEY"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{
+    "conversation_id": "conv_abc123",
+    "summary_text": "Customer asked about billing. Issue resolved."
+  }'</span></pre>
+      </div>
+
+      <h3>Error responses</h3>
+      <div class="card">
+        <table>
+          <tr><th>Code</th><th>When</th><th>Body example</th></tr>
+          <tr>
+            <td><span class="tag tag-400">400</span></td>
+            <td style="color:var(--muted)">Invalid JSON or missing fields</td>
+            <td><code>{"error": "Missing required fields for /details: ['agent_id']"}</code></td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-400">404</span></td>
+            <td style="color:var(--muted)">Unknown endpoint</td>
+            <td><code>{"error": "Endpoint '/other' not found."}</code></td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-400">405</span></td>
+            <td style="color:var(--muted)">Not a POST request</td>
+            <td><code>{"error": "Method Not Allowed. Use POST."}</code></td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-500">500</span></td>
+            <td style="color:var(--muted)">SQS unreachable</td>
+            <td><code>{"error": "Failed to queue message. Try again later."}</code></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ CODE ══════════════════════ -->
+    <div id="tab-code" class="panel">
+      <h3>Annotated code walkthrough</h3>
+
+      <div class="card">
+        <div class="card-title">Imports & AWS clients</div>
+        <pre><span class="kw">import</span> json, boto3, logging, uuid, os
+<span class="kw">from</span> datetime <span class="kw">import</span> datetime, timezone
+
+sqs = boto3.<span class="fn">client</span>(<span class="str">"sqs"</span>)  <span class="cm"># reused — Lambda keeps these warm</span>
+s3  = boto3.<span class="fn">client</span>(<span class="str">"s3"</span>)</pre>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px;">Clients are created <strong>outside</strong> the handler so they are reused across warm invocations — no extra latency on every call.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Reading environment variables</div>
+        <pre>SQS_QUEUE_URL = os.environ[<span class="str">"SQS_QUEUE_URL"</span>]
+S3_BUCKET     = os.environ[<span class="str">"S3_BUCKET"</span>]
+S3_PREFIX     = os.environ.<span class="fn">get</span>(<span class="str">"S3_PREFIX"</span>, <span class="str">"transcripts"</span>)</pre>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px;">Hard-coding values is bad practice. These three env vars must be set in the Lambda configuration.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Validating the request</div>
+        <pre><span class="var">resource</span>    = event.<span class="fn">get</span>(<span class="str">"resource"</span>, <span class="str">""</span>).<span class="fn">strip</span>(<span class="str">"/"</span>)
+<span class="var">http_method</span> = event.<span class="fn">get</span>(<span class="str">"httpMethod"</span>, <span class="str">""</span>)
+
+<span class="kw">if</span> http_method != <span class="str">"POST"</span>:
+    <span class="kw">return</span> <span class="fn">_response</span>(<span class="num">405</span>, {<span class="str">"error"</span>: <span class="str">"Method Not Allowed."</span>})
+
+<span class="kw">if</span> resource <span class="kw">not in</span> VALID_ENDPOINTS:
+    <span class="kw">return</span> <span class="fn">_response</span>(<span class="num">404</span>, {<span class="str">"error"</span>: <span class="str">f"Endpoint '/{resource}' not found."</span>})</pre>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Enriching & sending to SQS</div>
+        <pre>enriched = {
+    <span class="key">"record_id"</span>:   str(uuid.<span class="fn">uuid4</span>()),
+    <span class="key">"endpoint"</span>:    resource,
+    <span class="key">"received_at"</span>: datetime.<span class="fn">now</span>(timezone.utc).<span class="fn">isoformat</span>(),
+    <span class="key">"data"</span>:        payload,
+}
+
+sqs.<span class="fn">send_message</span>(
+    QueueUrl    = SQS_QUEUE_URL,
+    MessageBody = json.<span class="fn">dumps</span>(enriched),
+    MessageAttributes={<span class="str">"endpoint"</span>: {<span class="str">"StringValue"</span>: resource, <span class="str">"DataType"</span>: <span class="str">"String"</span>}}
+)</pre>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px;">The <code>MessageAttributes</code> let a downstream consumer filter by endpoint without parsing the body.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Writing to S3 with Hive partitioning</div>
+        <pre>date_path = datetime.<span class="fn">now</span>(timezone.utc).<span class="fn">strftime</span>(<span class="str">"%Y/%m/%d"</span>)
+s3_key    = <span class="str">f"{S3_PREFIX}/{resource}/{date_path}/{record_id}.json"</span>
+
+s3.<span class="fn">put_object</span>(
+    Bucket      = S3_BUCKET,
+    Key         = s3_key,
+    Body        = json.<span class="fn">dumps</span>(enriched),
+    ContentType = <span class="str">"application/json"</span>
+)</pre>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px;">This produces a path that Glue Crawler and Athena understand natively as partitions.</p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ CONFIG ══════════════════════ -->
+    <div id="tab-config" class="panel">
+      <h3>Lambda environment variables</h3>
+      <div class="card">
+        <table>
+          <tr><th>Variable</th><th>Example value</th><th>Required?</th></tr>
+          <tr>
+            <td><span class="tag tag-env">SQS_QUEUE_URL</span></td>
+            <td style="color:var(--muted);font-size:12px">https://sqs.us-east-1.amazonaws.com/123456789/my-queue</td>
+            <td><span class="req">required</span></td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-env">S3_BUCKET</span></td>
+            <td style="color:var(--muted);font-size:12px">landing</td>
+            <td><span class="req">required</span></td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-env">S3_PREFIX</span></td>
+            <td style="color:var(--muted);font-size:12px">transcripts (default)</td>
+            <td style="color:var(--muted)">optional</td>
+          </tr>
+        </table>
+      </div>
+
+      <h3>IAM permissions the Lambda role needs</h3>
+      <div class="card">
+        <div class="perm-list">
+          <div class="perm">sqs:SendMessage</div>
+          <div class="perm">s3:PutObject</div>
+          <div class="perm">logs:CreateLogGroup</div>
+          <div class="perm">logs:CreateLogStream</div>
+          <div class="perm">logs:PutLogEvents</div>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-top:12px;">Scope <code>s3:PutObject</code> to <code>arn:aws:s3:::landing/*</code> and <code>sqs:SendMessage</code> to your specific queue ARN.</p>
+      </div>
+
+      <h3>S3 landing path structure</h3>
+      <div class="s3path">s3://landing/transcripts/<span style="color:var(--accent)">details</span>/2025/06/11/f47ac10b-....json</div>
+      <div class="s3path">s3://landing/transcripts/<span style="color:var(--blue)">summary</span>/2025/06/11/3c4d91a2-....json</div>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px;">Hive-compatible partitions: Glue Crawler will auto-detect <code>endpoint</code>, <code>year</code>, <code>month</code>, <code>day</code> as partition columns in Athena.</p>
+
+      <h3>Customising required fields</h3>
+      <div class="card">
+        <p style="font-size:13px;color:var(--muted);line-height:1.7;">Edit the <code>_validate_payload()</code> function to match the exact fields your client sends. Just add or remove field names from the <code>required</code> lists for each endpoint.</p>
+        <pre><span class="kw">if</span> endpoint == <span class="str">"details"</span>:
+    required = [<span class="str">"conversation_id"</span>, <span class="str">"transcript"</span>, <span class="str">"agent_id"</span>]
+    <span class="cm"># ↑ change these to match your client's payload</span></pre>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      const tabs = ['overview','endpoints','code','config'];
+      t.classList.toggle('active', tabs[i] === name);
+    });
+    document.querySelectorAll('.panel').forEach(p => {
+      p.classList.toggle('active', p.id === 'tab-' + name);
+    });
+  }
+  function showTab(name, el) {
+    switchTab(name);
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+  }
+</script>
+</body>
+</html>
