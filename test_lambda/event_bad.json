@@ -1,0 +1,9 @@
+{
+  "resource": "/empatia/details/events",
+  "httpMethod": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "x-api-key": "test-key"
+  },
+  "body": "{\"tenant_id\":\"empatia\",\"tipo\":\"conversacion\",\"data\":{\"conversacion\":\"hola\"}}"
+}

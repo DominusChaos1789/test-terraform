@@ -1,0 +1,9 @@
+{
+  "resource": "/empatia/summary/events",
+  "httpMethod": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "x-api-key": "test-key"
+  },
+  "body": "{\"tenant_id\":\"empatia\",\"conversacion_id\":\"conv_0001\",\"tipo_documento\":\"CC\",\"numero_documento\":\"1234567890\",\"numero_telefono\":\"3001234567\",\"tipo_producto\":\"credito\",\"tipo\":\"resumen\",\"fecha_creacion\":\"2026-06-12T10:05:00Z\",\"data\":{\"motivo\":\"Consulta de factura\",\"resumen\":\"Se resolvio la duda del cliente.\"}}"
+}
