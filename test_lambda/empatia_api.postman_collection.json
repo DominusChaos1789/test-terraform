@@ -1,0 +1,413 @@
+{
+  "info": {
+    "name": "Empatia Transcripts API",
+    "description": "Collection for testing the Empatia API Gateway endpoints (/details/events and /summary/events). Sends conversation transcripts and summaries, which are queued in SQS and landed in S3.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://ba5xmxdwoh.execute-api.us-east-2.amazonaws.com/dev-1",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "REPLACE_WITH_YOUR_API_KEY",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      { "key": "key", "value": "x-api-key", "type": "string" },
+      { "key": "value", "value": "{{api_key}}", "type": "string" },
+      { "key": "in", "value": "header", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Details",
+      "item": [
+        {
+          "name": "POST Details - Valid",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 202', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "",
+                  "pm.test('Response has record_id', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('record_id');",
+                  "    pm.expect(json.endpoint).to.eql('details');",
+                  "});",
+                  "",
+                  "pm.test('Response has s3_key under transcripts/details', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.s3_key).to.include('transcripts/details/');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tenant_id\": \"empatia\",\n    \"conversacion_id\": \"conv_0001\",\n    \"tipo_documento\": \"CC\",\n    \"numero_documento\": \"1234567890\",\n    \"numero_telefono\": \"3001234567\",\n    \"tipo_producto\": \"credito\",\n    \"tipo\": \"conversacion\",\n    \"fecha_creacion\": \"2026-06-12T10:00:00Z\",\n    \"data\": {\n        \"conversacion\": \"Cliente: Hola, tengo una duda sobre mi factura.\\nAgente: Claro, dime en que te ayudo.\"\n    }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/empatia/details/events",
+              "host": ["{{base_url}}"],
+              "path": ["empatia", "details", "events"]
+            },
+            "description": "Sends a valid full conversation transcript. Expects 202 Accepted."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Details - Missing Field (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response contains error about missing fields', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('error');",
+                  "    pm.expect(json.error).to.include('Missing required fields');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tenant_id\": \"empatia\",\n    \"tipo\": \"conversacion\",\n    \"data\": {\n        \"conversacion\": \"hola\"\n    }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/empatia/details/events",
+              "host": ["{{base_url}}"],
+              "path": ["empatia", "details", "events"]
+            },
+            "description": "Missing conversacion_id, tipo_documento, numero_documento, numero_telefono, tipo_producto, fecha_creacion. Expects 400."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Details - Wrong tipo value (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error mentions tipo must be conversacion', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error).to.include(\"'conversacion'\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tenant_id\": \"empatia\",\n    \"conversacion_id\": \"conv_0001\",\n    \"tipo_documento\": \"CC\",\n    \"numero_documento\": \"1234567890\",\n    \"numero_telefono\": \"3001234567\",\n    \"tipo_producto\": \"credito\",\n    \"tipo\": \"resumen\",\n    \"fecha_creacion\": \"2026-06-12T10:00:00Z\",\n    \"data\": {\n        \"conversacion\": \"texto de prueba\"\n    }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/empatia/details/events",
+              "host": ["{{base_url}}"],
+              "path": ["empatia", "details", "events"]
+            },
+            "description": "Sends tipo='resumen' to the /details endpoint, which expects tipo='conversacion'. Expects 400."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Details - Invalid JSON (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error mentions invalid JSON', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error).to.include('Invalid JSON');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tenant_id\": \"empatia\",\n    \"conversacion_id\": \"conv_0001\",\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/empatia/details/events",
+              "host": ["{{base_url}}"],
+              "path": ["empatia", "details", "events"]
+            },
+            "description": "Malformed JSON (trailing comma). Expects 400 'Invalid JSON in request body.'"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Summary",
+      "item": [
+        {
+          "name": "POST Summary - Valid",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 202', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "",
+                  "pm.test('Response has record_id and correct endpoint', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('record_id');",
+                  "    pm.expect(json.endpoint).to.eql('summary');",
+                  "});",
+                  "",
+                  "pm.test('Response has s3_key under transcripts/summary', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.s3_key).to.include('transcripts/summary/');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tenant_id\": \"empatia\",\n    \"conversacion_id\": \"conv_0001\",\n    \"tipo_documento\": \"CC\",\n    \"numero_documento\": \"1234567890\",\n    \"numero_telefono\": \"3001234567\",\n    \"tipo_producto\": \"credito\",\n    \"tipo\": \"resumen\",\n    \"fecha_creacion\": \"2026-06-12T10:05:00Z\",\n    \"data\": {\n        \"motivo\": \"Consulta de factura\",\n        \"resumen\": \"El cliente pregunto por su factura y se le explico el detalle de cobros.\"\n    }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/empatia/summary/events",
+              "host": ["{{base_url}}"],
+              "path": ["empatia", "summary", "events"]
+            },
+            "description": "Sends a valid conversation summary. Expects 202 Accepted."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Summary - Missing data.resumen (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error mentions missing resumen field', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error).to.include('resumen');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tenant_id\": \"empatia\",\n    \"conversacion_id\": \"conv_0001\",\n    \"tipo_documento\": \"CC\",\n    \"numero_documento\": \"1234567890\",\n    \"numero_telefono\": \"3001234567\",\n    \"tipo_producto\": \"credito\",\n    \"tipo\": \"resumen\",\n    \"fecha_creacion\": \"2026-06-12T10:05:00Z\",\n    \"data\": {\n        \"motivo\": \"Consulta de factura\"\n    }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/empatia/summary/events",
+              "host": ["{{base_url}}"],
+              "path": ["empatia", "summary", "events"]
+            },
+            "description": "data.resumen is missing. Expects 400."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Summary - Wrong tipo value (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error mentions tipo must be resumen', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error).to.include(\"'resumen'\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tenant_id\": \"empatia\",\n    \"conversacion_id\": \"conv_0001\",\n    \"tipo_documento\": \"CC\",\n    \"numero_documento\": \"1234567890\",\n    \"numero_telefono\": \"3001234567\",\n    \"tipo_producto\": \"credito\",\n    \"tipo\": \"conversacion\",\n    \"fecha_creacion\": \"2026-06-12T10:05:00Z\",\n    \"data\": {\n        \"motivo\": \"Consulta de factura\",\n        \"resumen\": \"texto de prueba\"\n    }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/empatia/summary/events",
+              "host": ["{{base_url}}"],
+              "path": ["empatia", "summary", "events"]
+            },
+            "description": "Sends tipo='conversacion' to the /summary endpoint, which expects tipo='resumen'. Expects 400."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth & Method Errors",
+      "item": [
+        {
+          "name": "POST Details - No API Key (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 403', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tenant_id\": \"empatia\",\n    \"conversacion_id\": \"conv_0001\",\n    \"tipo_documento\": \"CC\",\n    \"numero_documento\": \"1234567890\",\n    \"numero_telefono\": \"3001234567\",\n    \"tipo_producto\": \"credito\",\n    \"tipo\": \"conversacion\",\n    \"fecha_creacion\": \"2026-06-12T10:00:00Z\",\n    \"data\": {\n        \"conversacion\": \"prueba sin api key\"\n    }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/empatia/details/events",
+              "host": ["{{base_url}}"],
+              "path": ["empatia", "details", "events"]
+            },
+            "description": "Deliberately overrides auth to 'No Auth' to confirm API Gateway blocks requests without x-api-key. Expects 403 Forbidden (from API Gateway, not the Lambda)."
+          },
+          "response": []
+        },
+        {
+          "name": "GET Details - Wrong Method",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/empatia/details/events",
+              "host": ["{{base_url}}"],
+              "path": ["empatia", "details", "events"]
+            },
+            "description": "GET is not a defined method on this resource. API Gateway will likely return 403 Missing Authentication Token (since no GET method exists) before the Lambda is ever invoked."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Unknown Endpoint (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404 or 403', function () {",
+                  "    pm.expect([403, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tenant_id\": \"empatia\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/empatia/wrong/events",
+              "host": ["{{base_url}}"],
+              "path": ["empatia", "wrong", "events"]
+            },
+            "description": "Hits a path that doesn't exist as an API Gateway resource. Will likely be blocked by API Gateway itself (403 Missing Authentication Token) rather than reaching the Lambda's own 404 logic, since no resource/method is defined for this path."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
