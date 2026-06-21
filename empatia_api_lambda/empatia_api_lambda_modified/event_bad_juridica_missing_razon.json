@@ -1,0 +1,9 @@
+{
+  "resource": "/empatia/summary/events",
+  "httpMethod": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer test-token"
+  },
+  "body": "{\"tenant_id\":\"empatia\",\"tipoPersona\":\"Juridica\",\"tipoIdentificacion\":\"NIT\",\"numeroIdentificacion\":\"900123456\",\"codigoTipificacion\":\"TIP002\",\"data\":{\"motivo\":\"x\",\"resumen\":\"y\"}}"
+}

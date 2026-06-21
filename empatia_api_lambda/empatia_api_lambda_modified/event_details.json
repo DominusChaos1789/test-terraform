@@ -1,0 +1,9 @@
+{
+  "resource": "/empatia/details/events",
+  "httpMethod": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer test-token"
+  },
+  "body": "{\"tenant_id\":\"empatia\",\"idLlamada\":\"call_0001\",\"tipoPersona\":\"Natural\",\"tipoIdentificacion\":\"CC\",\"numeroIdentificacion\":\"1234567890\",\"primerNombre\":\"Juan\",\"primerApellido\":\"Perez\",\"codigoTipificacion\":\"TIP001\",\"descripcionTipificacion\":\"Consulta general\",\"fechaInicio\":\"2026-06-21T10:00:00Z\",\"data\":{\"conversacion\":\"Cliente: Hola.\\nAgente: Hola, en que te ayudo?\"}}"
+}

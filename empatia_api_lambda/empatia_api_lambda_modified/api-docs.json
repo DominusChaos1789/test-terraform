@@ -1,0 +1,329 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Empatia Transcripts API",
+    "description": "API for ingesting conversation transcripts (details) and conversation summaries (summary) from client systems. Each request is validated, queued in SQS, and landed as JSON in the S3 'augusta-nexa-dev' bucket under Hive-style partitions.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Empatia Data Engineering"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://ba5xmxdwoh.execute-api.us-east-2.amazonaws.com/dev-1",
+      "description": "Development stage (dev-1)"
+    }
+  ],
+  "security": [
+    { "OAuth2": ["transcripts:write"] }
+  ],
+  "paths": {
+    "/empatia/details/events": {
+      "post": {
+        "summary": "Submit a full conversation transcript",
+        "description": "Receives the complete transcript of a conversation and lands it in S3 under augusta-nexa-dev/empatia/transcripciones/detalle/api/.",
+        "operationId": "postDetailsEvent",
+        "tags": ["Details"],
+        "security": [
+          { "OAuth2": ["transcripts:write"] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DetailsPayload" },
+              "example": {
+                "tenant_id": "empatia",
+                "idLlamada": "call_0001",
+                "tipoPersona": "Natural",
+                "tipoIdentificacion": "CC",
+                "numeroIdentificacion": "1234567890",
+                "primerNombre": "Juan",
+                "primerApellido": "Perez",
+                "codigoTipificacion": "TIP001",
+                "descripcionTipificacion": "Consulta general",
+                "fechaInicio": "2026-06-21T10:00:00Z",
+                "data": {
+                  "conversacion": "Cliente: Hola.\nAgente: Hola, en que te ayudo?"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Transcript accepted and queued for processing",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "example": {
+                  "message": "Transcript received successfully.",
+                  "record_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                  "endpoint": "details",
+                  "s3_key": "empatia/transcripciones/detalle/api/year=2026/month=06/day=21/f47ac10b-....json"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error - invalid JSON or missing/invalid fields",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Missing required fields for tipoPersona='Natural': ['primerNombre', 'primerApellido']" }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid OAuth2 access token",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Unauthorized" }
+              }
+            }
+          },
+          "403": {
+            "description": "Token valid but lacks the required scope, or no usage plan match",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Forbidden" }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error - failed to queue message",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Failed to queue message. Try again later." }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/empatia/summary/events": {
+      "post": {
+        "summary": "Submit a conversation summary",
+        "description": "Receives a summarised version of a conversation (motivo + resumen) and lands it in S3 under augusta-nexa-dev/empatia/transcripciones/resumen/api/.",
+        "operationId": "postSummaryEvent",
+        "tags": ["Summary"],
+        "security": [
+          { "OAuth2": ["transcripts:write"] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SummaryPayload" },
+              "example": {
+                "tenant_id": "empatia",
+                "idLlamada": "call_0001",
+                "tipoPersona": "Juridica",
+                "tipoIdentificacion": "NIT",
+                "numeroIdentificacion": "900123456",
+                "razonSocial": "Acme SAS",
+                "codigoTipificacion": "TIP002",
+                "descripcionTipificacion": "Consulta facturacion",
+                "fechaInicio": "2026-06-21T10:05:00Z",
+                "data": {
+                  "motivo": "Consulta de factura",
+                  "resumen": "El cliente pregunto por su factura y se le explico el detalle de cobros."
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Summary accepted and queued for processing",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" },
+                "example": {
+                  "message": "Transcript received successfully.",
+                  "record_id": "3c4d91a2-1234-4abc-9def-0e02b2c3d479",
+                  "endpoint": "summary",
+                  "s3_key": "empatia/transcripciones/resumen/api/year=2026/month=06/day=21/3c4d91a2-....json"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error - invalid JSON or missing/invalid fields",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Missing required fields in 'data': ['resumen']" }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid OAuth2 access token",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Unauthorized" }
+              }
+            }
+          },
+          "403": {
+            "description": "Token valid but lacks the required scope, or no usage plan match",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Forbidden" }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error - failed to queue message",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": "Failed to queue message. Try again later." }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "OAuth2": {
+        "type": "oauth2",
+        "description": "OAuth 2.0 Client Credentials flow. The client exchanges its client_id/client_secret for a Bearer access token, then sends it in the Authorization header on every request.",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://auth.empatia.example.com/oauth2/token",
+            "scopes": {
+              "transcripts:write": "Allows posting conversation transcripts and summaries"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "BaseCallFields": {
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "tipoPersona",
+          "tipoIdentificacion",
+          "numeroIdentificacion",
+          "codigoTipificacion",
+          "data"
+        ],
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "Identifier of the tenant/client sending the data"
+          },
+          "idLlamada": {
+            "type": "string",
+            "description": "Unique identifier of the call/conversation"
+          },
+          "tipoPersona": {
+            "type": "string",
+            "enum": ["Natural", "Juridica"],
+            "description": "Type of person. Determines which identity fields are required: Natural requires primerNombre + primerApellido; Juridica requires razonSocial."
+          },
+          "tipoIdentificacion": {
+            "type": "string",
+            "description": "Type of identification document (e.g. CC, NIT, CE)"
+          },
+          "numeroIdentificacion": {
+            "type": "string",
+            "description": "Identification document number"
+          },
+          "primerNombre": {
+            "type": "string",
+            "description": "First name. Required when tipoPersona is 'Natural'."
+          },
+          "primerApellido": {
+            "type": "string",
+            "description": "First last name. Required when tipoPersona is 'Natural'."
+          },
+          "razonSocial": {
+            "type": "string",
+            "description": "Company/legal entity name. Required when tipoPersona is 'Juridica'."
+          },
+          "codigoTipificacion": {
+            "type": "string",
+            "description": "Classification/typification code for the call"
+          },
+          "descripcionTipificacion": {
+            "type": "string",
+            "description": "Human-readable description of the typification code"
+          },
+          "fechaInicio": {
+            "type": "string",
+            "description": "Start date/time of the call (ISO 8601 recommended)"
+          }
+        }
+      },
+      "DetailsPayload": {
+        "allOf": [
+          { "$ref": "#/components/schemas/BaseCallFields" },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": ["conversacion"],
+                "properties": {
+                  "conversacion": {
+                    "type": "string",
+                    "description": "Full text of the conversation transcript"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SummaryPayload": {
+        "allOf": [
+          { "$ref": "#/components/schemas/BaseCallFields" },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": ["motivo", "resumen"],
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "description": "Reason/motive for the call"
+                  },
+                  "resumen": {
+                    "type": "string",
+                    "description": "Summary text of the conversation"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "message":   { "type": "string" },
+          "record_id": { "type": "string", "format": "uuid" },
+          "endpoint":  { "type": "string", "enum": ["details", "summary"] },
+          "s3_key":    { "type": "string" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" }
+        }
+      }
+    }
+  }
+}

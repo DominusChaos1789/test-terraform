@@ -1,0 +1,9 @@
+{
+  "resource": "/empatia/details/events",
+  "httpMethod": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer test-token"
+  },
+  "body": "{\"tenant_id\":\"empatia\",\"tipoPersona\":\"Natural\",\"tipoIdentificacion\":\"CC\",\"numeroIdentificacion\":\"123\",\"codigoTipificacion\":\"TIP001\",\"data\":{\"conversacion\":\"hola\"}}"
+}

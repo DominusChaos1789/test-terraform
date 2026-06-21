@@ -1,0 +1,9 @@
+{
+  "resource": "/empatia/summary/events",
+  "httpMethod": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer test-token"
+  },
+  "body": "{\"tenant_id\":\"empatia\",\"idLlamada\":\"call_0001\",\"tipoPersona\":\"Juridica\",\"tipoIdentificacion\":\"NIT\",\"numeroIdentificacion\":\"900123456\",\"razonSocial\":\"Acme SAS\",\"codigoTipificacion\":\"TIP002\",\"descripcionTipificacion\":\"Consulta facturacion\",\"fechaInicio\":\"2026-06-21T10:05:00Z\",\"data\":{\"motivo\":\"Consulta de factura\",\"resumen\":\"Se resolvio la duda del cliente.\"}}"
+}
