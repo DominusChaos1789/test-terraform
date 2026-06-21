@@ -1,0 +1,318 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "version": "1.0.0",
+    "title": "Empatia Transcripciones API"
+  },
+  "host": "ba5xmxdwoh.execute-api.us-east-2.amazonaws.com",
+  "basePath": "/dev-1",
+  "schemes": [
+    "https"
+  ],
+  "paths": {
+    "/empatia/details/events": {
+      "post": {
+        "operationId": "postDetailsEvent",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "security": [
+          {
+            "EmpatiaCognitoAuthorizer": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/DetailsPayload"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "202 response",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
+          },
+          "400": {
+            "description": "400 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "401 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "403 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "500 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "aws_proxy",
+          "httpMethod": "POST",
+          "uri": "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-2:ACCOUNT_ID:function:empatia-transcripts-ingest/invocations",
+          "passthroughBehavior": "when_no_match",
+          "contentHandling": "CONVERT_TO_TEXT"
+        }
+      }
+    },
+    "/empatia/summary/events": {
+      "post": {
+        "operationId": "postSummaryEvent",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "security": [
+          {
+            "EmpatiaCognitoAuthorizer": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SummaryPayload"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "202 response",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
+          },
+          "400": {
+            "description": "400 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "401 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "403 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "500 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "aws_proxy",
+          "httpMethod": "POST",
+          "uri": "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-2:ACCOUNT_ID:function:empatia-transcripts-ingest/invocations",
+          "passthroughBehavior": "when_no_match",
+          "contentHandling": "CONVERT_TO_TEXT"
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "EmpatiaCognitoAuthorizer": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "x-amazon-apigateway-authtype": "cognito_user_pools",
+      "x-amazon-apigateway-authorizer": {
+        "type": "cognito_user_pools",
+        "providerARNs": [
+          "arn:aws:cognito-idp:us-east-2:ACCOUNT_ID:userpool/USER_POOL_ID"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "BaseCallFields": {
+      "type": "object",
+      "required": [
+        "tenant_id",
+        "tipoPersona",
+        "tipoIdentificacion",
+        "numeroIdentificacion",
+        "codigoTipificacion",
+        "data"
+      ],
+      "properties": {
+        "tenant_id": {
+          "type": "string",
+          "description": "Identifier of the tenant/client sending the data"
+        },
+        "idLlamada": {
+          "type": "string",
+          "description": "Unique identifier of the call/conversation"
+        },
+        "tipoPersona": {
+          "type": "string",
+          "enum": [
+            "Natural",
+            "Juridica"
+          ],
+          "description": "Type of person. Natural requires primerNombre + primerApellido; Juridica requires razonSocial."
+        },
+        "tipoIdentificacion": {
+          "type": "string",
+          "description": "Type of identification document (e.g. CC, NIT, CE)"
+        },
+        "numeroIdentificacion": {
+          "type": "string",
+          "description": "Identification document number"
+        },
+        "primerNombre": {
+          "type": "string",
+          "description": "First name. Required when tipoPersona is 'Natural'."
+        },
+        "primerApellido": {
+          "type": "string",
+          "description": "First last name. Required when tipoPersona is 'Natural'."
+        },
+        "razonSocial": {
+          "type": "string",
+          "description": "Company/legal entity name. Required when tipoPersona is 'Juridica'."
+        },
+        "codigoTipificacion": {
+          "type": "string",
+          "description": "Classification/typification code for the call"
+        },
+        "descripcionTipificacion": {
+          "type": "string",
+          "description": "Human-readable description of the typification code"
+        },
+        "fechaInicio": {
+          "type": "string",
+          "description": "Start date/time of the call (ISO 8601 recommended)"
+        }
+      },
+      "title": "BaseCallFields"
+    },
+    "DetailsPayload": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/BaseCallFields"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/DetailsData"
+            }
+          }
+        }
+      ],
+      "title": "DetailsPayload"
+    },
+    "DetailsData": {
+      "type": "object",
+      "required": [
+        "conversacion"
+      ],
+      "properties": {
+        "conversacion": {
+          "type": "string",
+          "description": "Full text of the conversation transcript"
+        }
+      },
+      "title": "DetailsData"
+    },
+    "SummaryPayload": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/BaseCallFields"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/SummaryData"
+            }
+          }
+        }
+      ],
+      "title": "SummaryPayload"
+    },
+    "SummaryData": {
+      "type": "object",
+      "required": [
+        "motivo",
+        "resumen"
+      ],
+      "properties": {
+        "motivo": {
+          "type": "string",
+          "description": "Reason/motive for the call"
+        },
+        "resumen": {
+          "type": "string",
+          "description": "Summary text of the conversation"
+        }
+      },
+      "title": "SummaryData"
+    },
+    "SuccessResponse": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "record_id": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string",
+          "enum": [
+            "details",
+            "summary"
+          ]
+        },
+        "s3_key": {
+          "type": "string"
+        }
+      },
+      "title": "SuccessResponse"
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string"
+        }
+      },
+      "title": "ErrorResponse"
+    }
+  }
+}
