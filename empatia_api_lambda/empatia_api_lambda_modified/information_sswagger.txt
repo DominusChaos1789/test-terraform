@@ -1,0 +1,10 @@
+Converted to Swagger 2.0 with API Gateway extensions, matching the structure of your example exactly. Key differences from the OpenAPI 3.0.3 version:
+x-amazon-apigateway-integration — replaced the mock type from your pet store example with a real aws_proxy integration pointing at your Lambda's invoke ARN. You'll need to swap in your actual ACCOUNT_ID and confirm the function name matches what's in lambda.tf (empatia-transcripts-ingest).
+Cognito authorizer — since you confirmed Cognito User Pools, I added it as a securityDefinitions entry of type: apiKey (required by Swagger 2.0's structure) with the API Gateway extension x-amazon-apigateway-authorizer set to cognito_user_pools, referencing a providerARNs array. You'll need to fill in your real USER_POOL_ID and account ID there too.
+definitions instead of components/schemas** — Swagger 2.0 uses the flat top-level definitions block (as in your pet store example) rather than OpenAPI 3's nested components.schemas. I kept the same allOf composition pattern for DetailsPayload/SummaryPayload sharing BaseCallFields.
+Two placeholders to fill in before this is usable:
+
+ACCOUNT_ID (appears twice — Lambda ARN and Cognito ARN)
+USER_POOL_ID (your actual Cognito user pool ID)
+
+One thing worth flagging: this Swagger 2.0 format is specifically meant for aws apigateway import-rest-api or update-rest-api — i.e., you could use this file to actually deploy/recreate the API Gateway resource definitions via CLI, not just as documentation. If that's your intent, want me to also show the aws apigateway CLI command to import it?
