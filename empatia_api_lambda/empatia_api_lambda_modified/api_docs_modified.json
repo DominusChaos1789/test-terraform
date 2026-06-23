@@ -1,0 +1,320 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "version": "1.0.0",
+    "title": "Empatia Transcripciones API"
+  },
+  "host": "ba5xmxdwoh.execute-api.us-east-2.amazonaws.com",
+  "basePath": "/dev-1",
+  "schemes": [
+    "https"
+  ],
+  "paths": {
+    "/empatia/details/events": {
+      "post": {
+        "operationId": "postDetailsEvent",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "security": [
+          {
+            "EmpatiaCognitoAuthorizer": [
+              "https://ba5xmxdwoh.execute-api.us-east-2.amazonaws.com/dev-1/transcripts:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/DetailsPayload"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "202 response",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
+          },
+          "400": {
+            "description": "400 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "401 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "403 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "413": {
+            "description": "413 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "500 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "aws_proxy",
+          "httpMethod": "POST",
+          "uri": "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-2:ACCOUNT_ID:function:empatia-transcripts-ingest/invocations",
+          "passthroughBehavior": "when_no_match",
+          "contentHandling": "CONVERT_TO_TEXT"
+        }
+      }
+    },
+    "/empatia/summary/events": {
+      "post": {
+        "operationId": "postSummaryEvent",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "security": [
+          {
+            "EmpatiaCognitoAuthorizer": [
+              "https://ba5xmxdwoh.execute-api.us-east-2.amazonaws.com/dev-1/transcripts:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SummaryPayload"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "202 response",
+            "schema": {
+              "$ref": "#/definitions/SuccessResponse"
+            }
+          },
+          "400": {
+            "description": "400 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "401 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "403 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "413": {
+            "description": "413 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "500 response",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "aws_proxy",
+          "httpMethod": "POST",
+          "uri": "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-2:ACCOUNT_ID:function:empatia-transcripts-ingest/invocations",
+          "passthroughBehavior": "when_no_match",
+          "contentHandling": "CONVERT_TO_TEXT"
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "EmpatiaCognitoAuthorizer": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "x-amazon-apigateway-authtype": "cognito_user_pools",
+      "x-amazon-apigateway-authorizer": {
+        "type": "cognito_user_pools",
+        "providerARNs": [
+          "arn:aws:cognito-idp:us-east-2:ACCOUNT_ID:userpool/USER_POOL_ID"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "BaseCallFields": {
+      "type": "object",
+      "required": [
+        "tenant_id",
+        "tipoPersona",
+        "tipoIdentificacion",
+        "numeroIdentificacion",
+        "codigoTipificacion",
+        "data"
+      ],
+      "properties": {
+        "tenant_id": {
+          "type": "string"
+        },
+        "idLlamada": {
+          "type": "string"
+        },
+        "tipoPersona": {
+          "type": "string",
+          "enum": [
+            "Natural",
+            "Juridica"
+          ]
+        },
+        "tipoIdentificacion": {
+          "type": "string"
+        },
+        "numeroIdentificacion": {
+          "type": "string"
+        },
+        "primerNombre": {
+          "type": "string"
+        },
+        "primerApellido": {
+          "type": "string"
+        },
+        "razonSocial": {
+          "type": "string"
+        },
+        "codigoTipificacion": {
+          "type": "string"
+        },
+        "descripcionTipificacion": {
+          "type": "string"
+        },
+        "fechaInicio": {
+          "type": "string"
+        }
+      },
+      "title": "BaseCallFields"
+    },
+    "DetailsPayload": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/BaseCallFields"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/DetailsData"
+            }
+          }
+        }
+      ],
+      "title": "DetailsPayload"
+    },
+    "DetailsData": {
+      "type": "object",
+      "required": [
+        "conversacion"
+      ],
+      "properties": {
+        "conversacion": {
+          "type": "string"
+        }
+      },
+      "title": "DetailsData"
+    },
+    "SummaryPayload": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/definitions/BaseCallFields"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/SummaryData"
+            }
+          }
+        }
+      ],
+      "title": "SummaryPayload"
+    },
+    "SummaryData": {
+      "type": "object",
+      "required": [
+        "motivo",
+        "resumen"
+      ],
+      "properties": {
+        "motivo": {
+          "type": "string"
+        },
+        "resumen": {
+          "type": "string"
+        }
+      },
+      "title": "SummaryData"
+    },
+    "SuccessResponse": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "record_id": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string",
+          "enum": [
+            "details",
+            "summary"
+          ]
+        },
+        "s3_key": {
+          "type": "string"
+        }
+      },
+      "title": "SuccessResponse"
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string"
+        }
+      },
+      "title": "ErrorResponse"
+    }
+  }
+}
