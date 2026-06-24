@@ -1,0 +1,407 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "empatia-transcripciones-api",
+    "version": "1.0.0"
+  },
+  "basePath": "/dev-1",
+  "schemes": ["https"],
+  "paths": {
+    "/empatia/details/events": {
+      "post": {
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "detailsRequestModel",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/detailsRequestModel"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "202 response",
+            "schema": {
+              "$ref": "#/definitions/successResponseModel"
+            },
+            "headers": {
+              "Referrer-Policy": { "type": "string" },
+              "X-Frame-Options": { "type": "string" },
+              "Strict-Transport-Security": { "type": "string" },
+              "Access-Control-Allow-Origin": { "type": "string" },
+              "X-Content-Type-Options": { "type": "string" },
+              "Access-Control-Allow-Methods": { "type": "string" },
+              "Content-Security-Policy": { "type": "string" },
+              "X-XSS-Protection": { "type": "string" },
+              "Access-Control-Allow-Headers": { "type": "string" }
+            }
+          },
+          "400": {
+            "description": "400 response",
+            "schema": {
+              "$ref": "#/definitions/errorMessageModel"
+            },
+            "headers": {
+              "Referrer-Policy": { "type": "string" },
+              "X-Frame-Options": { "type": "string" },
+              "Strict-Transport-Security": { "type": "string" },
+              "Access-Control-Allow-Origin": { "type": "string" },
+              "X-Content-Type-Options": { "type": "string" },
+              "Access-Control-Allow-Methods": { "type": "string" },
+              "Content-Security-Policy": { "type": "string" },
+              "X-XSS-Protection": { "type": "string" },
+              "Access-Control-Allow-Headers": { "type": "string" }
+            }
+          },
+          "500": {
+            "description": "500 response",
+            "schema": {
+              "$ref": "#/definitions/errorMessageModel"
+            },
+            "headers": {
+              "Referrer-Policy": { "type": "string" },
+              "X-Frame-Options": { "type": "string" },
+              "Strict-Transport-Security": { "type": "string" },
+              "Access-Control-Allow-Origin": { "type": "string" },
+              "X-Content-Type-Options": { "type": "string" },
+              "Access-Control-Allow-Methods": { "type": "string" },
+              "Content-Security-Policy": { "type": "string" },
+              "X-XSS-Protection": { "type": "string" },
+              "Access-Control-Allow-Headers": { "type": "string" }
+            }
+          }
+        },
+        "security": [{ "empatia-authorizer": ["transcripts/write"] }],
+        "x-amazon-apigateway-request-validator": "Validate body, query string parameters, and headers",
+        "x-amazon-apigateway-integration": {
+          "type": "aws_proxy",
+          "httpMethod": "POST",
+          "uri": "arn:aws:lambda:us-east-2:ACCOUNT_ID:function:empatia-transcripts-ingest:live/invocations",
+          "responses": {
+            "default": {
+              "statusCode": "200",
+              "responseParameters": {
+                "method.response.header.X-Frame-Options": "'SAMEORIGIN'",
+                "method.response.header.X-XSS-Protection": "'1; mode=block'",
+                "method.response.header.Strict-Transport-Security": "'max-age=63072000; includeSubDomains; preload'",
+                "method.response.header.X-Content-Type-Options": "'nosniff'",
+                "method.response.header.Referrer-Policy": "'no-referrer-when-downgrade'",
+                "method.response.header.Content-Security-Policy": "'upgrade-insecure-requests;'",
+                "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,POST'",
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+                "method.response.header.Access-Control-Allow-Origin": "'https://empatia.example.com'"
+              }
+            }
+          },
+          "passthroughBehavior": "when_no_match",
+          "contentHandling": "CONVERT_TO_TEXT"
+        }
+      }
+    },
+    "/empatia/summary/events": {
+      "post": {
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "summaryRequestModel",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/summaryRequestModel"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "202 response",
+            "schema": {
+              "$ref": "#/definitions/successResponseModel"
+            },
+            "headers": {
+              "Referrer-Policy": { "type": "string" },
+              "X-Frame-Options": { "type": "string" },
+              "Strict-Transport-Security": { "type": "string" },
+              "Access-Control-Allow-Origin": { "type": "string" },
+              "X-Content-Type-Options": { "type": "string" },
+              "Access-Control-Allow-Methods": { "type": "string" },
+              "Content-Security-Policy": { "type": "string" },
+              "X-XSS-Protection": { "type": "string" },
+              "Access-Control-Allow-Headers": { "type": "string" }
+            }
+          },
+          "400": {
+            "description": "400 response",
+            "schema": {
+              "$ref": "#/definitions/errorMessageModel"
+            },
+            "headers": {
+              "Referrer-Policy": { "type": "string" },
+              "X-Frame-Options": { "type": "string" },
+              "Strict-Transport-Security": { "type": "string" },
+              "Access-Control-Allow-Origin": { "type": "string" },
+              "X-Content-Type-Options": { "type": "string" },
+              "Access-Control-Allow-Methods": { "type": "string" },
+              "Content-Security-Policy": { "type": "string" },
+              "X-XSS-Protection": { "type": "string" },
+              "Access-Control-Allow-Headers": { "type": "string" }
+            }
+          },
+          "500": {
+            "description": "500 response",
+            "schema": {
+              "$ref": "#/definitions/errorMessageModel"
+            },
+            "headers": {
+              "Referrer-Policy": { "type": "string" },
+              "X-Frame-Options": { "type": "string" },
+              "Strict-Transport-Security": { "type": "string" },
+              "Access-Control-Allow-Origin": { "type": "string" },
+              "X-Content-Type-Options": { "type": "string" },
+              "Access-Control-Allow-Methods": { "type": "string" },
+              "Content-Security-Policy": { "type": "string" },
+              "X-XSS-Protection": { "type": "string" },
+              "Access-Control-Allow-Headers": { "type": "string" }
+            }
+          }
+        },
+        "security": [{ "empatia-authorizer": ["transcripts/write"] }],
+        "x-amazon-apigateway-request-validator": "Validate body, query string parameters, and headers",
+        "x-amazon-apigateway-integration": {
+          "type": "aws_proxy",
+          "httpMethod": "POST",
+          "uri": "arn:aws:lambda:us-east-2:ACCOUNT_ID:function:empatia-transcripts-ingest:live/invocations",
+          "responses": {
+            "default": {
+              "statusCode": "200",
+              "responseParameters": {
+                "method.response.header.X-Frame-Options": "'SAMEORIGIN'",
+                "method.response.header.X-XSS-Protection": "'1; mode=block'",
+                "method.response.header.Strict-Transport-Security": "'max-age=63072000; includeSubDomains; preload'",
+                "method.response.header.X-Content-Type-Options": "'nosniff'",
+                "method.response.header.Referrer-Policy": "'no-referrer-when-downgrade'",
+                "method.response.header.Content-Security-Policy": "'upgrade-insecure-requests;'",
+                "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,POST'",
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+                "method.response.header.Access-Control-Allow-Origin": "'https://empatia.example.com'"
+              }
+            }
+          },
+          "passthroughBehavior": "when_no_match",
+          "contentHandling": "CONVERT_TO_TEXT"
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "empatia-authorizer": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "x-amazon-apigateway-authtype": "cognito_user_pools",
+      "x-amazon-apigateway-authorizer": {
+        "providerARNs": ["arn:aws:cognito-idp:us-east-2:ACCOUNT_ID:userpool/USER_POOL_ID"],
+        "type": "cognito_user_pools"
+      }
+    }
+  },
+  "definitions": {
+    "Empty": {
+      "type": "object",
+      "title": "Empty Schema"
+    },
+    "baseCallFields": {
+      "type": "object",
+      "required": [
+        "tenant_id",
+        "tipoPersona",
+        "tipoIdentificacion",
+        "numeroIdentificacion",
+        "codigoTipificacion",
+        "data"
+      ],
+      "properties": {
+        "tenant_id": {
+          "type": "string",
+          "description": "Identifier of the tenant/client sending the data",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "idLlamada": {
+          "type": "string",
+          "description": "Unique identifier of the call/conversation",
+          "maxLength": 128
+        },
+        "tipoPersona": {
+          "type": "string",
+          "description": "Type of person (Natural or Juridica)",
+          "pattern": "^(Natural|Juridica)$"
+        },
+        "tipoIdentificacion": {
+          "type": "string",
+          "description": "Type of identification document (e.g. CC, NIT, CE)",
+          "pattern": "^[A-Za-z]{1,10}$"
+        },
+        "numeroIdentificacion": {
+          "type": "string",
+          "description": "Identification document number",
+          "pattern": "^[0-9]{1,20}$"
+        },
+        "primerNombre": {
+          "type": "string",
+          "description": "First name. Required when tipoPersona is Natural.",
+          "pattern": "^[A-Za-zÀÈÌÒÙáéíóúñÑ ]{1,100}$"
+        },
+        "primerApellido": {
+          "type": "string",
+          "description": "First last name. Required when tipoPersona is Natural.",
+          "pattern": "^[A-Za-zÀÈÌÒÙáéíóúñÑ ]{1,100}$"
+        },
+        "razonSocial": {
+          "type": "string",
+          "description": "Company name. Required when tipoPersona is Juridica.",
+          "maxLength": 200
+        },
+        "codigoTipificacion": {
+          "type": "string",
+          "description": "Classification/typification code for the call",
+          "pattern": "^[A-Za-z0-9_-]{1,50}$"
+        },
+        "descripcionTipificacion": {
+          "type": "string",
+          "description": "Human-readable description of the typification code",
+          "maxLength": 255
+        },
+        "fechaInicio": {
+          "type": "string",
+          "description": "Start date/time of the call (ISO 8601)",
+          "maxLength": 40
+        }
+      }
+    },
+    "detailsRequestModel": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/definitions/baseCallFields" },
+        {
+          "type": "object",
+          "required": ["data"],
+          "properties": {
+            "data": {
+              "type": "object",
+              "required": ["conversacion"],
+              "properties": {
+                "conversacion": {
+                  "type": "string",
+                  "description": "Full text of the conversation transcript",
+                  "maxLength": 250000
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "summaryRequestModel": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/definitions/baseCallFields" },
+        {
+          "type": "object",
+          "required": ["data"],
+          "properties": {
+            "data": {
+              "type": "object",
+              "required": ["motivo", "resumen"],
+              "properties": {
+                "motivo": {
+                  "type": "string",
+                  "description": "Reason/motive for the call",
+                  "maxLength": 500
+                },
+                "resumen": {
+                  "type": "string",
+                  "description": "Summary text of the conversation",
+                  "maxLength": 5000
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "successResponseModel": {
+      "type": "object",
+      "required": ["message", "record_id", "endpoint", "s3_key"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Human-readable confirmation message"
+        },
+        "record_id": {
+          "type": "string",
+          "description": "Unique UUID assigned to the received record"
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "Which endpoint processed the request (details or summary)"
+        },
+        "s3_key": {
+          "type": "string",
+          "description": "S3 key where the record was landed"
+        }
+      }
+    },
+    "errorMessageModel": {
+      "type": "object",
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "x-amazon-apigateway-gateway-responses": {
+    "DEFAULT_4XX": {
+      "responseParameters": {
+        "gatewayresponse.header.X-Frame-Options": "'SAMEORIGIN'",
+        "gatewayresponse.header.X-Content-Type-Options": "'nosniff'",
+        "gatewayresponse.header.Access-Control-Allow-Methods": "'OPTIONS,POST'",
+        "gatewayresponse.header.X-XSS-Protection": "'1; mode=block'",
+        "gatewayresponse.header.Strict-Transport-Security": "'max-age=63072000; includeSubDomains; preload'",
+        "gatewayresponse.header.Content-Security-Policy": "'upgrade-insecure-requests;'",
+        "gatewayresponse.header.Access-Control-Allow-Origin": "'https://empatia.example.com'",
+        "gatewayresponse.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+        "gatewayresponse.header.Referrer-Policy": "'no-referrer-when-downgrade'"
+      },
+      "responseTemplates": {
+        "application/json": "{\"error\":$context.error.messageString}"
+      }
+    },
+    "DEFAULT_5XX": {
+      "responseParameters": {
+        "gatewayresponse.header.X-Frame-Options": "'SAMEORIGIN'",
+        "gatewayresponse.header.X-Content-Type-Options": "'nosniff'",
+        "gatewayresponse.header.Access-Control-Allow-Methods": "'OPTIONS,POST'",
+        "gatewayresponse.header.X-XSS-Protection": "'1; mode=block'",
+        "gatewayresponse.header.Strict-Transport-Security": "'max-age=63072000; includeSubDomains; preload'",
+        "gatewayresponse.header.Content-Security-Policy": "'upgrade-insecure-requests;'",
+        "gatewayresponse.header.Access-Control-Allow-Origin": "'https://empatia.example.com'",
+        "gatewayresponse.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+        "gatewayresponse.header.Referrer-Policy": "'no-referrer-when-downgrade'"
+      },
+      "responseTemplates": {
+        "application/json": "{\"error\":$context.error.messageString}"
+      }
+    }
+  },
+  "x-amazon-apigateway-request-validators": {
+    "Validate body, query string parameters, and headers": {
+      "validateRequestParameters": true,
+      "validateRequestBody": true
+    }
+  }
+}
