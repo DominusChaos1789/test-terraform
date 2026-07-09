@@ -1,0 +1,278 @@
+"""
+Pytest suite for lambda_handler.py
+
+Run with:
+    pip install pytest requests --break-system-packages
+    pytest test_lambda_handler.py -v
+
+boto3 clients (S3, Secrets Manager, SSM) and requests.post/get are mocked
+with unittest.mock so tests run offline with no AWS credentials needed.
+"""
+
+import json
+import os
+import time
+from unittest.mock import MagicMock, patch
+
+import pytest
+import requests
+
+os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
+os.environ.setdefault("ENDPOINT_SSM_PARAM", "/empatia/api/endpoint")
+os.environ.setdefault("TOKEN_URL_SSM_PARAM", "/empatia/api/token_url")
+os.environ.setdefault("API_CREDENTIALS_SECRET_ID", "empatia/api/credentials")
+os.environ.setdefault("ALLOWED_ENDPOINT_HOSTS", "api.client.com")
+
+import lambda_handler as lh  # noqa: E402  (import after env vars are set)
+
+
+VALID_PAYLOAD = {
+    "tenant_id": "cariai",
+    "idCall": "call-123",
+    "tipoPersona": "Natural",
+    "tipoIdentificacion": "CC",
+    "numeroIdentificacion": "1234567890",
+    "primerNombre": "Juan",
+    "primerApellido": "Perez",
+    "codigoTipificacion": "T01",
+    "descripcionTipificacion": "Contacto efectivo",
+    "fechaInicio": "2026-07-09T10:00:00Z",
+    "data": {"conversacion": "..."},
+}
+
+
+def make_s3_record(bucket="empatia-inbound", key="tenant/2026/07/09/file.json"):
+    return {"s3": {"bucket": {"name": bucket}, "object": {"key": key}}}
+
+
+@pytest.fixture(autouse=True)
+def reset_cache():
+    lh.reset_token_cache()
+    yield
+    lh.reset_token_cache()
+
+
+# ---------------------------------------------------------------------------
+# validate_payload
+# ---------------------------------------------------------------------------
+
+class TestValidatePayload:
+    def test_valid_payload_passes(self):
+        lh.validate_payload(VALID_PAYLOAD)  # should not raise
+
+    def test_missing_required_field_raises(self):
+        payload = {k: v for k, v in VALID_PAYLOAD.items() if k != "codigoTipificacion"}
+        with pytest.raises(lh.ValidationError, match="codigoTipificacion"):
+            lh.validate_payload(payload)
+
+    def test_empty_required_field_raises(self):
+        payload = dict(VALID_PAYLOAD, numeroIdentificacion="")
+        with pytest.raises(lh.ValidationError):
+            lh.validate_payload(payload)
+
+    def test_invalid_tipo_persona_raises(self):
+        payload = dict(VALID_PAYLOAD, tipoPersona="Empresa")
+        with pytest.raises(lh.ValidationError, match="tipoPersona"):
+            lh.validate_payload(payload)
+
+    @pytest.mark.parametrize("bad_tenant", ["../etc", "a b", "tenant;drop", ""])
+    def test_invalid_tenant_id_raises(self, bad_tenant):
+        payload = dict(VALID_PAYLOAD, tenant_id=bad_tenant)
+        with pytest.raises(lh.ValidationError):
+            lh.validate_payload(payload)
+
+    def test_non_dict_payload_raises(self):
+        with pytest.raises(lh.ValidationError):
+            lh.validate_payload(["not", "a", "dict"])
+
+
+# ---------------------------------------------------------------------------
+# SSRF allowlist guard
+# ---------------------------------------------------------------------------
+
+class TestAllowedEndpoint:
+    def test_https_allowed_host_passes(self):
+        assert lh._is_allowed_endpoint("https://api.client.com/v1/ingest", ["api.client.com"])
+
+    def test_http_scheme_rejected(self):
+        assert not lh._is_allowed_endpoint("http://api.client.com/v1/ingest", ["api.client.com"])
+
+    def test_host_not_in_allowlist_rejected(self):
+        assert not lh._is_allowed_endpoint("https://evil.example.com/x", ["api.client.com"])
+
+    def test_malformed_url_rejected(self):
+        assert not lh._is_allowed_endpoint("not-a-url", ["api.client.com"])
+
+
+# ---------------------------------------------------------------------------
+# Token caching
+# ---------------------------------------------------------------------------
+
+class TestGetAccessToken:
+    @patch("lambda_handler.requests.post")
+    def test_fetches_and_caches_token(self, mock_post):
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"access_token": "tok-1", "expires_in": 3600},
+        )
+        mock_post.return_value.raise_for_status = lambda: None
+
+        token1 = lh._get_access_token("https://auth.client.com/token", "cid", "csecret")
+        token2 = lh._get_access_token("https://auth.client.com/token", "cid", "csecret")
+
+        assert token1 == "tok-1"
+        assert token2 == "tok-1"
+        mock_post.assert_called_once()  # second call served from cache
+
+    @patch("lambda_handler.requests.post")
+    def test_refetches_after_expiry(self, mock_post):
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"access_token": "tok-1", "expires_in": 1},
+        )
+        mock_post.return_value.raise_for_status = lambda: None
+
+        lh._get_access_token("https://auth.client.com/token", "cid", "csecret")
+        lh._token_cache["expires_at"] = time.time() - 1  # force expiry
+
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"access_token": "tok-2", "expires_in": 3600},
+        )
+        mock_post.return_value.raise_for_status = lambda: None
+
+        token2 = lh._get_access_token("https://auth.client.com/token", "cid", "csecret")
+        assert token2 == "tok-2"
+        assert mock_post.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# _post_with_retry
+# ---------------------------------------------------------------------------
+
+class TestPostWithRetry:
+    @patch("lambda_handler.requests.post")
+    def test_success_on_first_attempt(self, mock_post):
+        mock_post.return_value = MagicMock(status_code=200)
+        mock_post.return_value.raise_for_status = lambda: None
+
+        resp = lh._post_with_retry("https://api.client.com/ingest", {}, VALID_PAYLOAD)
+        assert resp.status_code == 200
+        mock_post.assert_called_once()
+
+    @patch("lambda_handler.time.sleep", lambda *_: None)
+    @patch("lambda_handler.requests.post")
+    def test_retries_on_transient_error_then_succeeds(self, mock_post):
+        ok_resp = MagicMock(status_code=200)
+        ok_resp.raise_for_status = lambda: None
+        mock_post.side_effect = [requests.ConnectionError("boom"), ok_resp]
+
+        resp = lh._post_with_retry("https://api.client.com/ingest", {}, VALID_PAYLOAD, max_attempts=3)
+        assert resp.status_code == 200
+        assert mock_post.call_count == 2
+
+    @patch("lambda_handler.time.sleep", lambda *_: None)
+    @patch("lambda_handler.requests.post")
+    def test_raises_after_exhausting_attempts(self, mock_post):
+        mock_post.side_effect = requests.ConnectionError("boom")
+        with pytest.raises(requests.ConnectionError):
+            lh._post_with_retry("https://api.client.com/ingest", {}, VALID_PAYLOAD, max_attempts=2)
+        assert mock_post.call_count == 2
+
+    @patch("lambda_handler.requests.post")
+    def test_401_forces_token_reset_and_retries(self, mock_post):
+        unauthorized = MagicMock(status_code=401)
+        ok_resp = MagicMock(status_code=200)
+        ok_resp.raise_for_status = lambda: None
+        mock_post.side_effect = [unauthorized, ok_resp]
+
+        lh._token_cache["access_token"] = "stale-token"
+        lh._token_cache["expires_at"] = time.time() + 3600
+
+        resp = lh._post_with_retry("https://api.client.com/ingest", {}, VALID_PAYLOAD, max_attempts=3)
+        assert resp.status_code == 200
+        assert lh._token_cache["access_token"] is None  # cache was cleared
+
+
+# ---------------------------------------------------------------------------
+# process_record / handler (end-to-end with mocked AWS + HTTP)
+# ---------------------------------------------------------------------------
+
+class TestProcessRecordAndHandler:
+    def _mock_s3_get_object(self, payload_dict):
+        body = MagicMock()
+        body.read.return_value = json.dumps(payload_dict).encode("utf-8")
+        return {"Body": body}
+
+    @patch("lambda_handler.requests.post")
+    @patch("lambda_handler.secrets_client")
+    @patch("lambda_handler.ssm_client")
+    @patch("lambda_handler.s3_client")
+    def test_process_record_happy_path(self, mock_s3, mock_ssm, mock_secrets, mock_post):
+        mock_s3.get_object.return_value = self._mock_s3_get_object(VALID_PAYLOAD)
+        mock_ssm.get_parameter.side_effect = [
+            {"Parameter": {"Value": "https://api.client.com/v1/ingest"}},
+            {"Parameter": {"Value": "https://auth.client.com/token"}},
+        ]
+        mock_secrets.get_secret_value.return_value = {
+            "SecretString": json.dumps({"client_id": "cid", "client_secret": "csecret"})
+        }
+
+        token_resp = MagicMock(status_code=200, json=lambda: {"access_token": "tok", "expires_in": 3600})
+        token_resp.raise_for_status = lambda: None
+        post_resp = MagicMock(status_code=202)
+        post_resp.raise_for_status = lambda: None
+        mock_post.side_effect = [token_resp, post_resp]
+
+        result = lh.process_record(make_s3_record())
+
+        assert result["status_code"] == 202
+        assert result["bucket"] == "empatia-inbound"
+
+    @patch("lambda_handler.secrets_client")
+    @patch("lambda_handler.ssm_client")
+    @patch("lambda_handler.s3_client")
+    def test_process_record_blocks_disallowed_host(self, mock_s3, mock_ssm, mock_secrets):
+        mock_s3.get_object.return_value = self._mock_s3_get_object(VALID_PAYLOAD)
+        mock_ssm.get_parameter.side_effect = [
+            {"Parameter": {"Value": "https://evil.example.com/ingest"}},
+            {"Parameter": {"Value": "https://auth.client.com/token"}},
+        ]
+
+        with pytest.raises(lh.ConfigError, match="allowlist"):
+            lh.process_record(make_s3_record())
+
+    @patch("lambda_handler.s3_client")
+    def test_process_record_invalid_payload_raises_validation_error(self, mock_s3):
+        bad_payload = dict(VALID_PAYLOAD)
+        del bad_payload["codigoTipificacion"]
+        mock_s3.get_object.return_value = self._mock_s3_get_object(bad_payload)
+
+        with pytest.raises(lh.ValidationError):
+            lh.process_record(make_s3_record())
+
+    @patch("lambda_handler.requests.post")
+    @patch("lambda_handler.secrets_client")
+    @patch("lambda_handler.ssm_client")
+    @patch("lambda_handler.s3_client")
+    def test_handler_collects_validation_errors_without_raising(
+        self, mock_s3, mock_ssm, mock_secrets, mock_post
+    ):
+        bad_payload = dict(VALID_PAYLOAD)
+        del bad_payload["numeroIdentificacion"]
+        mock_s3.get_object.return_value = self._mock_s3_get_object(bad_payload)
+
+        event = {"Records": [make_s3_record(key="bad/file.json")]}
+        response = lh.handler(event, context=None)
+
+        assert response["processed"] == []
+        assert len(response["errors"]) == 1
+        assert "numeroIdentificacion" in response["errors"][0]["error"]
+
+    @patch("lambda_handler.s3_client")
+    def test_handler_reraises_unexpected_errors(self, mock_s3):
+        mock_s3.get_object.side_effect = RuntimeError("S3 is down")
+
+        event = {"Records": [make_s3_record()]}
+        with pytest.raises(RuntimeError):
+            lh.handler(event, context=None)
